@@ -2,7 +2,7 @@
 .DS_Store
 Thumbs.db
 
-# 环境变量（保护敏感信息）
+# Environment variables
 .env
 .env.local
 .env.*.local
@@ -36,7 +36,7 @@ yarn-error.log*
 *.swp
 *.swo
 
-# 测试
+# Testing
 .pytest_cache/
 .coverage
 htmlcov/
@@ -45,16 +45,27 @@ htmlcov/
 .cursor/
 .claude/
 
-# 文档与测试程序
+# Documentation
 mydoc/
 mytest/
 
-# 日志文件
+# Logs
 backend/logs/
 *.log
 
-# 上传文件
-backend/uploads/
+# Uploads (large files)
+backend/uploads/simulations/
+backend/local_storage/
 
-# Docker 数据
-data/
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# OASIS logs
+log/
+backend/.venv/Lib/site-packages/oasis/log/
+
+# Temp files
+*.tmp
+*.temp

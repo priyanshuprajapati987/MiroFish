@@ -13,14 +13,44 @@ OASIS Reddit模拟预设脚本
     python run_reddit_simulation.py --config /path/to/simulation_config.json --no-wait  # 完成后立即关闭
 """
 
+# ============================================================
+# 解决 Windows 编码问题：在所有 import 之前设置 UTF-8 编码
+# 这是为了修复 OASIS 第三方库读取文件时未指定编码的问题
+# ============================================================
+import sys
+import os
+
+if sys.platform == 'win32':
+    # 设置 Python 默认 I/O 编码为 UTF-8
+    os.environ.setdefault('PYTHONUTF8', '1')
+    os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
+    
+    # 重新配置标准输出流为 UTF-8（解决控制台中文乱码）
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    
+    # Monkey-patch 内置 open 函数以默认使用 UTF-8
+    import builtins
+    _original_open = builtins.open
+    
+    def _utf8_open(file, mode='r', buffering=-1, encoding=None, errors=None, 
+                   newline=None, closefd=True, opener=None):
+        """包装 open() 函数，对于文本模式默认使用 UTF-8 编码"""
+        if encoding is None and 'b' not in mode:
+            encoding = 'utf-8'
+        return _original_open(file, mode, buffering, encoding, errors, 
+                              newline, closefd, opener)
+    
+    builtins.open = _utf8_open
+
 import argparse
 import asyncio
 import json
 import logging
-import os
 import random
 import signal
-import sys
 import sqlite3
 from datetime import datetime
 from typing import Dict, Any, List, Optional

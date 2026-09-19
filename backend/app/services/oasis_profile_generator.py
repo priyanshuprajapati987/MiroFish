@@ -758,6 +758,11 @@ class OasisProfileGenerator:
 6. country: 国家（使用中文，如"中国"）
 7. profession: 职业
 8. interested_topics: 感兴趣话题数组
+9. social_behavior: 社交互动行为指南，包含:
+   - like_frequency: 给他人帖子点赞的频率（high/medium/low）
+   - comment_frequency: 评论他人帖子的频率（high/medium/low）
+   - repost_frequency: 转发他人帖子的频率（high/medium/low）
+   - interaction_style: 互动风格描述（如"积极回应支持者"、"理性讨论"、"情绪化表达"等）
 
 重要:
 - 所有字段值必须是字符串或数字，不要使用换行符
@@ -765,6 +770,7 @@ class OasisProfileGenerator:
 - {get_language_instruction()} (gender字段必须用英文male/female)
 - 内容要与实体信息保持一致
 - age必须是有效的整数，gender必须是"male"或"female"
+- social_behavior字段必须包含，这决定了agent如何与其他agent互动
 """
 
     def _build_group_persona_prompt(
@@ -807,13 +813,20 @@ class OasisProfileGenerator:
 6. country: 国家（使用中文，如"中国"）
 7. profession: 机构职能描述
 8. interested_topics: 关注领域数组
+9. social_behavior: 社交互动行为指南，包含:
+   - like_frequency: 给他人帖子点赞的频率（high/medium/low）
+   - comment_frequency: 评论他人帖子的频率（high/medium/low）
+   - repost_frequency: 转发他人帖子的频率（high/medium/low）
+   - interaction_style: 互动风格描述（如"官方回应"、"专业讨论"、"谨慎表态"等）
 
 重要:
 - 所有字段值必须是字符串或数字，不允许null值
 - persona必须是一段连贯的文字描述，不要使用换行符
 - {get_language_instruction()} (gender字段必须用英文"other")
 - age必须是整数30，gender必须是字符串"other"
-- 机构账号发言要符合其身份定位"""
+- 机构账号发言要符合其身份定位
+- social_behavior字段必须包含，这决定了机构账号如何与其他agent互动
+"""
     
     def _generate_profile_rule_based(
         self,

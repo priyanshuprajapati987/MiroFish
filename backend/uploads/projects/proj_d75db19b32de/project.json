@@ -1,0 +1,401 @@
+{
+  "project_id": "proj_d75db19b32de",
+  "name": "Orbit Satellite Launch",
+  "status": "graph_completed",
+  "created_at": "2026-09-18T14:12:06.025717",
+  "updated_at": "2026-09-18T14:12:40.697922",
+  "files": [
+    {
+      "filename": "orbit_launch.md",
+      "size": 1296
+    }
+  ],
+  "total_text_length": 1321,
+  "ontology": {
+    "entity_types": [
+      {
+        "name": "StartupCompany",
+        "description": "Orbit startup offering satellite internet services",
+        "attributes": [
+          {
+            "name": "org_name",
+            "type": "text",
+            "description": "Official company name"
+          },
+          {
+            "name": "headquarters_location",
+            "type": "text",
+            "description": "City and country of headquarters"
+          },
+          {
+            "name": "founded_year",
+            "type": "text",
+            "description": "Year the company was founded"
+          }
+        ],
+        "examples": [
+          "Orbit",
+          "Blue Origin"
+        ]
+      },
+      {
+        "name": "SatelliteProvider",
+        "description": "Company providing satellite internet connectivity",
+        "attributes": [
+          {
+            "name": "org_name",
+            "type": "text",
+            "description": "Company name"
+          },
+          {
+            "name": "market_share_estimate",
+            "type": "text",
+            "description": "Estimated market share percentage"
+          },
+          {
+            "name": "coverage_area",
+            "type": "text",
+            "description": "Geographic coverage description"
+          }
+        ],
+        "examples": [
+          "Starlink",
+          "OneWeb"
+        ]
+      },
+      {
+        "name": "GovernmentAgency",
+        "description": "Regulatory body overseeing satellite operations",
+        "attributes": [
+          {
+            "name": "org_name",
+            "type": "text",
+            "description": "Agency name"
+          },
+          {
+            "name": "jurisdiction",
+            "type": "text",
+            "description": "Country or region of authority"
+          },
+          {
+            "name": "contact_email",
+            "type": "text",
+            "description": "Official contact email"
+          }
+        ],
+        "examples": [
+          "Federal Communications Commission",
+          "European Space Agency"
+        ]
+      },
+      {
+        "name": "NonGovernmentOrganization",
+        "description": "NGO collaborating on digital‑divide initiatives",
+        "attributes": [
+          {
+            "name": "org_name",
+            "type": "text",
+            "description": "Organization name"
+          },
+          {
+            "name": "focus_area",
+            "type": "text",
+            "description": "Primary area of work"
+          },
+          {
+            "name": "website_url",
+            "type": "text",
+            "description": "Official website URL"
+          }
+        ],
+        "examples": [
+          "Internet Society",
+          "Digital Frontier Foundation"
+        ]
+      },
+      {
+        "name": "Influencer",
+        "description": "Tech influencer participating in marketing campaigns",
+        "attributes": [
+          {
+            "name": "full_name",
+            "type": "text",
+            "description": "Influencer's full name"
+          },
+          {
+            "name": "platform",
+            "type": "text",
+            "description": "Primary social media platform"
+          },
+          {
+            "name": "follower_count",
+            "type": "text",
+            "description": "Number of followers"
+          }
+        ],
+        "examples": [
+          "Linus Tech Tips",
+          "Marques Brownlee"
+        ]
+      },
+      {
+        "name": "EducationalInstitution",
+        "description": "School or university receiving free internet tier",
+        "attributes": [
+          {
+            "name": "org_name",
+            "type": "text",
+            "description": "Institution name"
+          },
+          {
+            "name": "institution_type",
+            "type": "text",
+            "description": "University, college, or school"
+          },
+          {
+            "name": "location",
+            "type": "text",
+            "description": "City and country"
+          }
+        ],
+        "examples": [
+          "MIT",
+          "Rural Community College"
+        ]
+      },
+      {
+        "name": "MediaOutlet",
+        "description": "Media organization reporting on the launch",
+        "attributes": [
+          {
+            "name": "org_name",
+            "type": "text",
+            "description": "Outlet name"
+          },
+          {
+            "name": "media_type",
+            "type": "text",
+            "description": "Online, TV, print, etc."
+          },
+          {
+            "name": "website_url",
+            "type": "text",
+            "description": "Official website"
+          }
+        ],
+        "examples": [
+          "TechCrunch",
+          "BBC News"
+        ]
+      },
+      {
+        "name": "CommunityGroup",
+        "description": "Local community group involved in beta testing",
+        "attributes": [
+          {
+            "name": "org_name",
+            "type": "text",
+            "description": "Group name"
+          },
+          {
+            "name": "region",
+            "type": "text",
+            "description": "Geographic region served"
+          },
+          {
+            "name": "member_count",
+            "type": "text",
+            "description": "Number of members"
+          }
+        ],
+        "examples": [
+          "Rural Connectivity Beta Group",
+          "Village Tech Hub"
+        ]
+      },
+      {
+        "name": "Person",
+        "description": "Any individual not covered by more specific types",
+        "attributes": [
+          {
+            "name": "full_name",
+            "type": "text",
+            "description": "Person's full name"
+          },
+          {
+            "name": "role",
+            "type": "text",
+            "description": "Primary role or occupation"
+          },
+          {
+            "name": "affiliation",
+            "type": "text",
+            "description": "Associated organization"
+          }
+        ],
+        "examples": [
+          "John Doe",
+          "Jane Smith"
+        ]
+      },
+      {
+        "name": "Organization",
+        "description": "Any organization not covered by more specific types",
+        "attributes": [
+          {
+            "name": "org_name",
+            "type": "text",
+            "description": "Organization name"
+          },
+          {
+            "name": "sector",
+            "type": "text",
+            "description": "Industry sector"
+          },
+          {
+            "name": "headquarters_location",
+            "type": "text",
+            "description": "Location of headquarters"
+          }
+        ],
+        "examples": [
+          "Acme Corp",
+          "Global NGO"
+        ]
+      }
+    ],
+    "edge_types": [
+      {
+        "name": "PARTNERS_WITH",
+        "description": "Collaboration partnership between entities",
+        "source_targets": [
+          {
+            "source": "StartupCompany",
+            "target": "NonGovernmentOrganization"
+          },
+          {
+            "source": "Organization",
+            "target": "Organization"
+          }
+        ],
+        "attributes": [
+          {
+            "name": "details",
+            "type": "text",
+            "description": "Additional details about this ontology type."
+          }
+        ]
+      },
+      {
+        "name": "COMPETES_WITH",
+        "description": "Competing in the same market segment",
+        "source_targets": [
+          {
+            "source": "StartupCompany",
+            "target": "SatelliteProvider"
+          },
+          {
+            "source": "SatelliteProvider",
+            "target": "SatelliteProvider"
+          }
+        ],
+        "attributes": [
+          {
+            "name": "details",
+            "type": "text",
+            "description": "Additional details about this ontology type."
+          }
+        ]
+      },
+      {
+        "name": "REGULATES",
+        "description": "Regulatory oversight over an organization",
+        "source_targets": [
+          {
+            "source": "GovernmentAgency",
+            "target": "Organization"
+          }
+        ],
+        "attributes": [
+          {
+            "name": "details",
+            "type": "text",
+            "description": "Additional details about this ontology type."
+          }
+        ]
+      },
+      {
+        "name": "COLLABORATES_WITH",
+        "description": "Influencer works together with an organization",
+        "source_targets": [
+          {
+            "source": "Influencer",
+            "target": "StartupCompany"
+          },
+          {
+            "source": "Influencer",
+            "target": "Organization"
+          }
+        ],
+        "attributes": [
+          {
+            "name": "details",
+            "type": "text",
+            "description": "Additional details about this ontology type."
+          }
+        ]
+      },
+      {
+        "name": "PROVIDES_SERVICE_TO",
+        "description": "Organization offers service to a community group",
+        "source_targets": [
+          {
+            "source": "StartupCompany",
+            "target": "CommunityGroup"
+          },
+          {
+            "source": "SatelliteProvider",
+            "target": "CommunityGroup"
+          }
+        ],
+        "attributes": [
+          {
+            "name": "details",
+            "type": "text",
+            "description": "Additional details about this ontology type."
+          }
+        ]
+      },
+      {
+        "name": "TARGETS_MARKET",
+        "description": "Organization targets a specific community group",
+        "source_targets": [
+          {
+            "source": "StartupCompany",
+            "target": "CommunityGroup"
+          },
+          {
+            "source": "SatelliteProvider",
+            "target": "CommunityGroup"
+          }
+        ],
+        "attributes": [
+          {
+            "name": "details",
+            "type": "text",
+            "description": "Additional details about this ontology type."
+          }
+        ]
+      }
+    ]
+  },
+  "analysis_summary": "The report mentions concrete actors such as Orbit (a startup), competing satellite providers, regulators, NGOs, influencers, schools, media and community beta groups. These eight concrete entity types cover all speaking participants. Person and Organization are added as fallback types to capture any other individuals or groups. Relationships model partnerships, competition, regulation, influencer collaborations, service provision and market targeting, reflecting typical social‑media interaction patterns in an opinion simulation.",
+  "graph_id": "mirofish_00ecc64ee0574c9c",
+  "graph_build_task_id": "b0823865-dbb9-4bc2-8e73-2eac70630a42",
+  "zep_batch_id": "40ac23ef-8cb2-4891-a6d9-1451adcbbc8e",
+  "zep_batch_operation_id": "2dd7ffda8efbb922cf405e806e5df0804cbf51ade9d7768c553f9a47c442dbad",
+  "simulation_requirement": "Predict the market success of Orbit satellite launch in 2026. Consider competition, pricing, coverage, and risk factors.",
+  "chunk_size": 500,
+  "chunk_overlap": 50,
+  "error": null
+}
