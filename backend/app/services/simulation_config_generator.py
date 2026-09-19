@@ -601,25 +601,25 @@ class SimulationConfigGenerator:
         return {
             "total_simulation_hours": 72,
             "minutes_per_round": 60,  # 每轮1小时，加快时间流速
-            "agents_per_hour_min": max(1, num_entities // 15),
-            "agents_per_hour_max": max(5, num_entities // 5),
+            "agents_per_hour_min": max(3, num_entities // 6),
+            "agents_per_hour_max": max(8, num_entities // 2),
             "peak_hours": [19, 20, 21, 22],
             "off_peak_hours": [0, 1, 2, 3, 4, 5],
             "morning_hours": [6, 7, 8],
             "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-            "reasoning": "使用默认中国人作息配置（每轮1小时）"
+            "reasoning": "使用默认中国人作息配置（每轮1小时）- 优化为更多agent活跃"
         }
     
     def _parse_time_config(self, result: Dict[str, Any], num_entities: int) -> TimeSimulationConfig:
         """解析时间配置结果，并验证agents_per_hour值不超过总agent数"""
-        # 获取原始值
-        agents_per_hour_min = result.get("agents_per_hour_min", max(1, num_entities // 15))
-        agents_per_hour_max = result.get("agents_per_hour_max", max(5, num_entities // 5))
+        # 获取原始值 - 使用更积极的默认值
+        agents_per_hour_min = result.get("agents_per_hour_min", max(3, num_entities // 6))
+        agents_per_hour_max = result.get("agents_per_hour_max", max(8, num_entities // 2))
         
         # 验证并修正：确保不超过总agent数
         if agents_per_hour_min > num_entities:
             logger.warning(f"agents_per_hour_min ({agents_per_hour_min}) 超过总Agent数 ({num_entities})，已修正")
-            agents_per_hour_min = max(1, num_entities // 10)
+            agents_per_hour_min = max(1, num_entities // 3)
         
         if agents_per_hour_max > num_entities:
             logger.warning(f"agents_per_hour_max ({agents_per_hour_max}) 超过总Agent数 ({num_entities})，已修正")
@@ -844,20 +844,23 @@ class SimulationConfigGenerator:
 ## 任务
 为每个实体生成活动配置，注意：
 - **时间符合目标用户群体作息**：以下为参考（东八区），请根据模拟场景调整
-- **官方机构**（University/GovernmentAgency）：活跃度低(0.1-0.3)，工作时间(9-17)活动，响应慢(60-240分钟)，影响力高(2.5-3.0)
-- **媒体**（MediaOutlet）：活跃度中(0.4-0.6)，全天活动(8-23)，响应快(5-30分钟)，影响力高(2.0-2.5)
-- **个人**（Student/Person/Alumni）：活跃度高(0.6-0.9)，主要晚间活动(18-23)，响应快(1-15分钟)，影响力低(0.8-1.2)
-- **公众人物/专家**：活跃度中(0.4-0.6)，影响力中高(1.5-2.0)
+- **官方机构**（University/GovernmentAgency）：活跃度中高(0.5-0.7)，工作时间(8-22)活动，响应中速(30-120分钟)，影响力高(2.5-3.0)
+- **媒体**（MediaOutlet）：活跃度高(0.7-0.9)，全天活动(6-23)，响应快(2-15分钟)，影响力高(2.0-2.5)
+- **个人**（Student/Person/Alumni）：活跃度高(0.8-0.95)，全天活动(7-23)，响应快(1-10分钟)，影响力低(0.8-1.2)
+- **公众人物/专家**：活跃度高(0.7-0.9)，影响力中高(1.5-2.0)
+- **公司/组织**（StartupCompany/SatelliteProvider等）：活跃度高(0.8-0.9)，全天活动(7-23)，响应快(1-15分钟)
+
+**重要**：为了产生足够的社交互动，所有agent的activity_level应该>=0.6，active_hours应该覆盖7-23点。
 
 返回JSON格式（不要markdown）：
 {{
     "agent_configs": [
         {{
             "agent_id": <必须与输入一致>,
-            "activity_level": <0.0-1.0>,
-            "posts_per_hour": <发帖频率>,
-            "comments_per_hour": <评论频率>,
-            "active_hours": [<活跃小时列表，考虑中国人作息>],
+            "activity_level": <0.6-1.0>,
+            "posts_per_hour": <发帖频率 0.3-1.0>,
+            "comments_per_hour": <评论频率 0.5-2.0>,
+            "active_hours": [<活跃小时列表，应覆盖7-23>],
             "response_delay_min": <最小响应延迟分钟>,
             "response_delay_max": <最大响应延迟分钟>,
             "sentiment_bias": <-1.0到1.0>,
@@ -868,7 +871,7 @@ class SimulationConfigGenerator:
     ]
 }}"""
 
-        system_prompt = "你是社交媒体行为分析专家。返回纯JSON，配置需符合模拟场景中目标用户群体的作息习惯。"
+        system_prompt = "你是社交媒体行为分析专家。返回纯JSON，配置需确保agent足够活跃以产生社交互动。"
         system_prompt = f"{system_prompt}\n\n{get_language_instruction()}\nIMPORTANT: The 'stance' field value MUST be one of the English strings: 'supportive', 'opposing', 'neutral', 'observer'. All JSON field names and numeric values must remain unchanged. Only natural language text fields should use the specified language."
 
         try:
@@ -908,83 +911,83 @@ class SimulationConfigGenerator:
         return configs
     
     def _generate_agent_config_by_rule(self, entity: EntityNode) -> Dict[str, Any]:
-        """基于规则生成单个Agent配置（中国人作息）"""
+        """基于规则生成单个Agent配置（优化为更高活跃度）"""
         entity_type = (entity.get_entity_type() or "Unknown").lower()
         
         if entity_type in ["university", "governmentagency", "ngo"]:
-            # 官方机构：工作时间活动，低频率，高影响力
+            # 官方机构：工作时间活动，中等频率，高影响力
             return {
-                "activity_level": 0.2,
-                "posts_per_hour": 0.1,
-                "comments_per_hour": 0.05,
-                "active_hours": list(range(9, 18)),  # 9:00-17:59
-                "response_delay_min": 60,
-                "response_delay_max": 240,
+                "activity_level": 0.6,
+                "posts_per_hour": 0.3,
+                "comments_per_hour": 0.2,
+                "active_hours": list(range(8, 23)),  # 8:00-22:59
+                "response_delay_min": 30,
+                "response_delay_max": 120,
                 "sentiment_bias": 0.0,
                 "stance": "neutral",
                 "influence_weight": 3.0
             }
         elif entity_type in ["mediaoutlet"]:
-            # 媒体：全天活动，中等频率，高影响力
+            # 媒体：全天活动，高频率，高影响力
             return {
-                "activity_level": 0.5,
-                "posts_per_hour": 0.8,
-                "comments_per_hour": 0.3,
-                "active_hours": list(range(7, 24)),  # 7:00-23:59
-                "response_delay_min": 5,
-                "response_delay_max": 30,
+                "activity_level": 0.8,
+                "posts_per_hour": 1.0,
+                "comments_per_hour": 0.5,
+                "active_hours": list(range(6, 24)),  # 6:00-23:59
+                "response_delay_min": 2,
+                "response_delay_max": 15,
                 "sentiment_bias": 0.0,
                 "stance": "observer",
                 "influence_weight": 2.5
             }
         elif entity_type in ["professor", "expert", "official"]:
-            # 专家/教授：工作+晚间活动，中等频率
+            # 专家/教授：工作+晚间活动，中高频率
             return {
-                "activity_level": 0.4,
-                "posts_per_hour": 0.3,
-                "comments_per_hour": 0.5,
-                "active_hours": list(range(8, 22)),  # 8:00-21:59
-                "response_delay_min": 15,
-                "response_delay_max": 90,
+                "activity_level": 0.7,
+                "posts_per_hour": 0.5,
+                "comments_per_hour": 0.8,
+                "active_hours": list(range(7, 23)),  # 7:00-22:59
+                "response_delay_min": 10,
+                "response_delay_max": 60,
                 "sentiment_bias": 0.0,
                 "stance": "neutral",
                 "influence_weight": 2.0
             }
         elif entity_type in ["student"]:
-            # 学生：晚间为主，高频率
+            # 学生：全天活跃，高频率
             return {
-                "activity_level": 0.8,
-                "posts_per_hour": 0.6,
-                "comments_per_hour": 1.5,
-                "active_hours": [8, 9, 10, 11, 12, 13, 18, 19, 20, 21, 22, 23],  # 上午+晚间
+                "activity_level": 0.9,
+                "posts_per_hour": 0.8,
+                "comments_per_hour": 2.0,
+                "active_hours": list(range(7, 24)),  # 7:00-23:59
                 "response_delay_min": 1,
-                "response_delay_max": 15,
+                "response_delay_max": 10,
                 "sentiment_bias": 0.0,
                 "stance": "neutral",
                 "influence_weight": 0.8
             }
         elif entity_type in ["alumni"]:
-            # 校友：晚间为主
+            # 校友：全天活跃
             return {
-                "activity_level": 0.6,
-                "posts_per_hour": 0.4,
-                "comments_per_hour": 0.8,
-                "active_hours": [12, 13, 19, 20, 21, 22, 23],  # 午休+晚间
-                "response_delay_min": 5,
-                "response_delay_max": 30,
+                "activity_level": 0.8,
+                "posts_per_hour": 0.6,
+                "comments_per_hour": 1.2,
+                "active_hours": list(range(7, 24)),  # 7:00-23:59
+                "response_delay_min": 3,
+                "response_delay_max": 20,
                 "sentiment_bias": 0.0,
                 "stance": "neutral",
                 "influence_weight": 1.0
             }
         else:
-            # 普通人：晚间高峰
+            # 普通人/公司/组织：全天活跃
             return {
-                "activity_level": 0.7,
-                "posts_per_hour": 0.5,
-                "comments_per_hour": 1.2,
-                "active_hours": [9, 10, 11, 12, 13, 18, 19, 20, 21, 22, 23],  # 白天+晚间
-                "response_delay_min": 2,
-                "response_delay_max": 20,
+                "activity_level": 0.85,
+                "posts_per_hour": 0.7,
+                "comments_per_hour": 1.5,
+                "active_hours": list(range(7, 24)),  # 7:00-23:59
+                "response_delay_min": 1,
+                "response_delay_max": 15,
                 "sentiment_bias": 0.0,
                 "stance": "neutral",
                 "influence_weight": 1.0

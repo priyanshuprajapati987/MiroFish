@@ -1093,14 +1093,14 @@ def get_active_agents_for_round(
     current_hour: int,
     round_num: int
 ) -> List:
-    """根据时间和配置决定本轮激活哪些Agent"""
+    """根据时间和配置决定本轮激活哪些Agent - 优化版，确保更多agent活跃"""
     time_config = config.get("time_config", {})
     agent_configs = config.get("agent_configs", [])
     
     base_min = time_config.get("agents_per_hour_min", 5)
     base_max = time_config.get("agents_per_hour_max", 20)
     
-    peak_hours = time_config.get("peak_hours", [9, 10, 11, 14, 15, 20, 21, 22])
+    peak_hours = time_config.get("peak_hours", [19, 20, 21, 22])
     off_peak_hours = time_config.get("off_peak_hours", [0, 1, 2, 3, 4, 5])
     
     if current_hour in peak_hours:
@@ -1111,18 +1111,28 @@ def get_active_agents_for_round(
         multiplier = 1.0
     
     target_count = int(random.uniform(base_min, base_max) * multiplier)
+    target_count = max(3, target_count)
     
     candidates = []
     for cfg in agent_configs:
         agent_id = cfg.get("agent_id", 0)
-        active_hours = cfg.get("active_hours", list(range(8, 23)))
-        activity_level = cfg.get("activity_level", 0.5)
+        active_hours = cfg.get("active_hours", list(range(7, 23)))
+        activity_level = cfg.get("activity_level", 0.7)
         
         if current_hour not in active_hours:
+            if activity_level >= 0.7:
+                candidates.append(agent_id)
             continue
         
         if random.random() < activity_level:
             candidates.append(agent_id)
+    
+    if len(candidates) < target_count:
+        for cfg in agent_configs:
+            agent_id = cfg.get("agent_id", 0)
+            activity_level = cfg.get("activity_level", 0.7)
+            if agent_id not in candidates and activity_level >= 0.7:
+                candidates.append(agent_id)
     
     selected_ids = random.sample(
         candidates, 
@@ -1347,7 +1357,12 @@ async def run_twitter_simulation(
                 # Create new post
                 actions[agent] = LLMAction()
         
-        await result.env.step(actions)
+        try:
+            await result.env.step(actions)
+        except Exception as e:
+            log_info(f"[Twitter] Round {round_num + 1} error (will retry next round): {str(e)[:100]}")
+            await asyncio.sleep(3)
+            continue
         
         # 从数据库获取实际执行的动作并记录
         actual_actions, last_rowid = fetch_new_actions_from_db(
@@ -1629,7 +1644,13 @@ async def run_reddit_simulation(
                 # Create new post
                 actions[agent] = LLMAction()
         
-        await result.env.step(actions)
+        try:
+            await result.env.step(actions)
+        except Exception as e:
+            log_info(f"[Reddit] Round {round_num + 1} error (will retry next round): {str(e)[:100]}")
+            # Add longer delay on error
+            await asyncio.sleep(5)
+            continue
         
         # 从数据库获取实际执行的动作并记录
         actual_actions, last_rowid = fetch_new_actions_from_db(
@@ -1653,7 +1674,7 @@ async def run_reddit_simulation(
             action_logger.log_round_end(round_num + 1, round_action_count)
         
         # Add delay to avoid Groq API rate limits
-        await asyncio.sleep(2)
+        await asyncio.sleep(3)
         
         if (round_num + 1) % 20 == 0:
             progress = (round_num + 1) / total_rounds * 100
@@ -1763,12 +1784,16 @@ async def main():
     elif args.reddit_only:
         reddit_result = await run_reddit_simulation(config, simulation_dir, reddit_logger, log_manager, args.max_rounds)
     else:
-        # 并行运行（每个平台使用独立的日志记录器）
-        results = await asyncio.gather(
-            run_twitter_simulation(config, simulation_dir, twitter_logger, log_manager, args.max_rounds),
-            run_reddit_simulation(config, simulation_dir, reddit_logger, log_manager, args.max_rounds),
-        )
-        twitter_result, reddit_result = results
+        # Sequential mode: Twitter first, then Reddit (to avoid rate limits)
+        log_manager.info("运行模式: 顺序执行 (Twitter -> Reddit)")
+        log_manager.info("先运行Twitter模拟...")
+        twitter_result = await run_twitter_simulation(config, simulation_dir, twitter_logger, log_manager, args.max_rounds)
+        
+        log_manager.info("Twitter完成! 等待5秒后运行Reddit...")
+        await asyncio.sleep(5)
+        
+        log_manager.info("运行Reddit模拟...")
+        reddit_result = await run_reddit_simulation(config, simulation_dir, reddit_logger, log_manager, args.max_rounds)
     
     total_elapsed = (datetime.now() - start_time).total_seconds()
     log_manager.info("=" * 60)
