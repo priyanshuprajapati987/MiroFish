@@ -12,7 +12,7 @@ import threading
 import subprocess
 import signal
 import atexit
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Set
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -234,15 +234,15 @@ class SimulationRunner:
     
     # 图谱记忆更新配置
     _graph_memory_enabled: Dict[str, bool] = {}  # simulation_id -> enabled
-    _finalization_locks: Dict[str, threading.Lock] = {}
+    _finalization_locks: Dict[str, threading.RLock] = {}
     _finalization_locks_guard = threading.Lock()
-    _manual_stop_requests: set[str] = set()
+    _manual_stop_requests: Set[str] = set()
 
     @classmethod
-    def _finalization_lock(cls, simulation_id: str) -> threading.Lock:
+    def _finalization_lock(cls, simulation_id: str) -> threading.RLock:
         with cls._finalization_locks_guard:
             return cls._finalization_locks.setdefault(
-                simulation_id, threading.Lock()
+                simulation_id, threading.RLock()
             )
 
     @classmethod
@@ -250,7 +250,7 @@ class SimulationRunner:
         cls,
         simulation_id: str,
         runner_status: RunnerStatus,
-        error: str | None = None,
+        error: Optional[str] = None,
     ) -> None:
         """Keep persisted simulation metadata aligned with run_state.json."""
 
@@ -355,17 +355,29 @@ class SimulationRunner:
     
     @classmethod
     def _save_run_state(cls, state: SimulationRunState):
-        """保存运行状态到文件"""
+        """保存运行状态到文件（原子写入，防止崩溃时文件损坏）"""
+        import tempfile
         sim_dir = os.path.join(cls.RUN_STATE_DIR, state.simulation_id)
         os.makedirs(sim_dir, exist_ok=True)
         state_file = os.path.join(sim_dir, "run_state.json")
-        
+
         data = state.to_detail_dict()
-        
-        with open(state_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        
+
+        temp_fd, temp_path = tempfile.mkstemp(dir=sim_dir, suffix='.tmp')
+        try:
+            with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            os.replace(temp_path, state_file)
+        except BaseException:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+            raise
+
         cls._run_states[state.simulation_id] = state
+        if state.runner_status in {RunnerStatus.COMPLETED, RunnerStatus.FAILED, RunnerStatus.STOPPED}:
+            cls._run_states.pop(state.simulation_id, None)
     
     @classmethod
     def start_simulation(
@@ -666,6 +678,14 @@ class SimulationRunner:
         except Exception as e:
             logger.error(f"监控线程异常: {simulation_id}, error={str(e)}")
             monitor_error = e
+            if process and process.poll() is None:
+                try:
+                    cls._terminate_process(process, simulation_id, timeout=5)
+                except Exception:
+                    try:
+                        process.kill()
+                    except Exception:
+                        pass
         
         finally:
             # Manual stop and natural completion can observe the same process
@@ -876,6 +896,13 @@ class SimulationRunner:
                 return f.tell()
         except Exception as e:
             logger.warning(f"读取动作日志失败: {log_path}, error={e}")
+            try:
+                file_size = os.path.getsize(log_path)
+                if position > file_size:
+                    logger.info(f"日志文件被截断，重置读取位置: {log_path}")
+                    return 0
+            except OSError:
+                pass
             return position
     
     @classmethod
@@ -939,15 +966,22 @@ class SimulationRunner:
                     process.wait(timeout=5)
             except Exception as e:
                 logger.warning(f"taskkill 失败，尝试 terminate: {e}")
-                process.terminate()
                 try:
+                    process.terminate()
                     process.wait(timeout=5)
+                except ProcessLookupError:
+                    return
                 except subprocess.TimeoutExpired:
-                    process.kill()
+                    try:
+                        process.kill()
+                    except ProcessLookupError:
+                        pass
         else:
             # Unix: 使用进程组终止
-            # 由于使用了 start_new_session=True，进程组 ID 等于主进程 PID
-            pgid = os.getpgid(process.pid)
+            try:
+                pgid = os.getpgid(process.pid)
+            except ProcessLookupError:
+                return
             logger.info(f"终止进程组 (Unix): simulation={simulation_id}, pgid={pgid}")
             
             # 先发送 SIGTERM 给整个进程组
@@ -1444,18 +1478,20 @@ class SimulationRunner:
     
     # 防止重复清理的标志
     _cleanup_done = False
-    
+    _cleanup_lock = threading.Lock()
+
     @classmethod
     def cleanup_all_simulations(cls):
         """
         清理所有运行中的模拟进程
-        
+
         在服务器关闭时调用，确保所有子进程被终止
         """
         # 防止重复清理
-        if cls._cleanup_done:
-            return
-        cls._cleanup_done = True
+        with cls._cleanup_lock:
+            if cls._cleanup_done:
+                return
+            cls._cleanup_done = True
 
         updater_ids = set(ZepGraphMemoryManager.get_simulation_ids())
         simulation_ids = sorted(
@@ -1915,10 +1951,10 @@ class SimulationRunner:
                 "timestamp": response.timestamp
             }
         except TimeoutError:
-            # 超时可能是因为环境正在关闭
             return {
-                "success": True,
-                "message": "环境关闭命令已发送（等待响应超时，环境可能正在关闭）"
+                "success": False,
+                "message": "环境关闭命令已发送但响应超时，环境可能正在关闭",
+                "timeout": True
             }
     
     @classmethod
@@ -1939,40 +1975,41 @@ class SimulationRunner:
         
         try:
             conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            
-            if agent_id is not None:
-                cursor.execute("""
-                    SELECT user_id, info, created_at
-                    FROM trace
-                    WHERE action = 'interview' AND user_id = ?
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                """, (agent_id, limit))
-            else:
-                cursor.execute("""
-                    SELECT user_id, info, created_at
-                    FROM trace
-                    WHERE action = 'interview'
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                """, (limit,))
-            
-            for user_id, info_json, created_at in cursor.fetchall():
-                try:
-                    info = json.loads(info_json) if info_json else {}
-                except json.JSONDecodeError:
-                    info = {"raw": info_json}
+            try:
+                cursor = conn.cursor()
                 
-                results.append({
-                    "agent_id": user_id,
-                    "response": info.get("response", info),
-                    "prompt": info.get("prompt", ""),
-                    "timestamp": created_at,
-                    "platform": platform_name
-                })
-            
-            conn.close()
+                if agent_id is not None:
+                    cursor.execute("""
+                        SELECT user_id, info, created_at
+                        FROM trace
+                        WHERE action = 'interview' AND user_id = ?
+                        ORDER BY created_at DESC
+                        LIMIT ?
+                    """, (agent_id, limit))
+                else:
+                    cursor.execute("""
+                        SELECT user_id, info, created_at
+                        FROM trace
+                        WHERE action = 'interview'
+                        ORDER BY created_at DESC
+                        LIMIT ?
+                    """, (limit,))
+                
+                for user_id, info_json, created_at in cursor.fetchall():
+                    try:
+                        info = json.loads(info_json) if info_json else {}
+                    except json.JSONDecodeError:
+                        info = {"raw": info_json}
+                    
+                    results.append({
+                        "agent_id": user_id,
+                        "response": info.get("response", info),
+                        "prompt": info.get("prompt", ""),
+                        "timestamp": created_at,
+                        "platform": platform_name
+                    })
+            finally:
+                conn.close()
             
         except Exception as e:
             logger.error(f"读取Interview历史失败 ({platform_name}): {e}")

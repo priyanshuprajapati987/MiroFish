@@ -10,6 +10,7 @@ Zep检索工具服务
 
 import time
 import json
+import re
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from zep_cloud import NotFoundError
@@ -1418,7 +1419,6 @@ class ZepToolsService:
                 response_text = f"【Twitter平台回答】\n{twitter_text}\n\n【Reddit平台回答】\n{reddit_text}"
 
                 # 提取关键引言（从两个平台的回答中）
-                import re
                 combined_responses = f"{twitter_response} {reddit_response}"
 
                 # 清理响应文本：去掉标记、编号、Markdown 等干扰
@@ -1487,7 +1487,6 @@ class ZepToolsService:
         text = response.strip()
         if 'tool_name' not in text[:80]:
             return response
-        import re as _re
         try:
             data = json.loads(text)
             if isinstance(data, dict) and 'arguments' in data:
@@ -1495,7 +1494,7 @@ class ZepToolsService:
                     if key in data['arguments']:
                         return str(data['arguments'][key])
         except (json.JSONDecodeError, KeyError, TypeError):
-            match = _re.search(r'"content"\s*:\s*"((?:[^"\\]|\\.)*)"', text)
+            match = re.search(r'"content"\s*:\s*"((?:[^"\\]|\\.)*)"', text)
             if match:
                 return match.group(1).replace('\\n', '\n').replace('\\"', '"')
         return response
@@ -1504,6 +1503,10 @@ class ZepToolsService:
         """加载模拟的Agent人设文件"""
         import os
         import csv
+        
+        # 防止路径遍历攻击
+        if not re.match(r'^[a-zA-Z0-9_-]+$', simulation_id):
+            raise ValueError(f"Invalid simulation_id format: {simulation_id}")
         
         # 构建人设文件路径
         sim_dir = os.path.join(
@@ -1612,10 +1615,18 @@ class ZepToolsService:
             selected_indices = response.get("selected_indices", [])[:max_agents]
             reasoning = response.get("reasoning", "基于相关性自动选择")
             
+            # 验证LLM返回的索引类型
+            validated_indices = []
+            for idx in selected_indices:
+                try:
+                    validated_indices.append(int(idx))
+                except (TypeError, ValueError):
+                    continue
+            
             # 获取选中的Agent完整信息
             selected_agents = []
             valid_indices = []
-            for idx in selected_indices:
+            for idx in validated_indices:
                 if 0 <= idx < len(profiles):
                     selected_agents.append(profiles[idx])
                     valid_indices.append(idx)
@@ -1691,7 +1702,7 @@ class ZepToolsService:
         # 收集所有采访内容
         interview_texts = []
         for interview in interviews:
-            interview_texts.append(f"【{interview.agent_name}（{interview.agent_role}）】\n{interview.response[:500]}")
+            interview_texts.append(f"【{interview.agent_name}（{interview.agent_role}）】\n{interview.response[:2000]}")
         
         quote_instruction = "引用受访者原话时使用中文引号「」" if get_locale() == 'zh' else 'Use quotation marks "" when quoting interviewees'
         system_prompt = f"""你是一个专业的新闻编辑。请根据多位受访者的回答，生成一份采访摘要。

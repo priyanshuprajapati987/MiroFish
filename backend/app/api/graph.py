@@ -158,6 +158,9 @@ def list_projects():
     列出所有项目
     """
     limit = request.args.get('limit', 50, type=int)
+    if not isinstance(limit, int) or limit <= 0:
+        limit = 50
+    limit = min(limit, 200)
     projects = ProjectManager.list_projects(limit=limit)
     
     return jsonify({
@@ -885,11 +888,12 @@ def _build_graph_impl():
                     project.error = str(e)
                     ProjectManager.save_project(project)
 
+                    build_logger.debug(traceback.format_exc())
                     task_manager.update_task(
                         task_id,
                         status=TaskStatus.FAILED,
                         message=t('progress.buildFailed', error=str(e)),
-                        error=traceback.format_exc()
+                        error=str(e)
                     )
         
         # 启动后台线程
@@ -909,10 +913,10 @@ def _build_graph_impl():
     except GraphInUseError as e:
         return jsonify({"success": False, "error": str(e)}), 409
     except Exception as e:
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500
 
 
@@ -986,10 +990,10 @@ def get_graph_data(graph_id: str):
         })
         
     except Exception as e:
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500
 
 
@@ -1054,8 +1058,8 @@ def delete_graph(graph_id: str):
     except GraphInUseError as e:
         return jsonify({"success": False, "error": str(e)}), 409
     except Exception as e:
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500

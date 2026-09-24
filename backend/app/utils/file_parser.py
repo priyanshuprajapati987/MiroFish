@@ -177,6 +177,9 @@ def split_text_into_chunks(
     if len(text) <= chunk_size:
         return [text] if text.strip() else []
     
+    if overlap >= chunk_size:
+        raise ValueError(f"overlap ({overlap}) must be less than chunk_size ({chunk_size})")
+    
     chunks = []
     start = 0
     

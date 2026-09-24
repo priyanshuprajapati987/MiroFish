@@ -294,13 +294,14 @@ class ZepGraphMemoryUpdater:
     
     def start(self):
         """启动后台工作线程"""
-        if self._running:
-            return
+        with self._acceptance_lock:
+            if self._running:
+                return
+            self._running = True
 
         # Capture locale before spawning background thread
         current_locale = get_locale()
 
-        self._running = True
         self._worker_thread = threading.Thread(
             target=self._worker_loop,
             args=(current_locale,),
@@ -370,7 +371,8 @@ class ZepGraphMemoryUpdater:
         """
         # 跳过DO_NOTHING类型的活动
         if activity.action_type == "DO_NOTHING":
-            self._skipped_count += 1
+            with self._acceptance_lock:
+                self._skipped_count += 1
             return
 
         with self._acceptance_lock:
@@ -392,7 +394,8 @@ class ZepGraphMemoryUpdater:
         if "event_type" in data:
             return
         if data.get("success") is False:
-            self._skipped_count += 1
+            with self._acceptance_lock:
+                self._skipped_count += 1
             return
         
         activity = AgentActivity(

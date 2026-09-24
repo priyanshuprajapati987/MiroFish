@@ -194,6 +194,9 @@ class ZepEntityReader:
                     or edge["target_node_uuid"] == node_uuid
                 ]
 
+            # graph_id缺失时API只返回出向边，记录警告
+            logger.warning(f"get_node_edges called without graph_id for node {node_uuid[:8]}... — only outgoing edges will be returned")
+            
             # 使用重试机制调用Zep API
             edges = self._call_with_retry(
                 func=lambda: self.client.graph.node.get_edges(node_uuid=node_uuid),

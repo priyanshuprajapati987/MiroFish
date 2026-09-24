@@ -534,30 +534,6 @@ const fetchRunStatus = async () => {
   }
 }
 
-// 检查所有启用的平台是否已完成
-const checkPlatformsCompleted = (data) => {
-  // 如果没有任何平台数据，返回 false
-  if (!data) return false
-  
-  // 检查各平台的完成状态
-  const twitterCompleted = data.twitter_completed === true
-  const redditCompleted = data.reddit_completed === true
-  
-  // 如果至少有一个平台完成了，检查是否所有启用的平台都完成了
-  // 通过 actions_count 判断平台是否被启用（如果 count > 0 或 running 曾为 true）
-  const twitterEnabled = (data.twitter_actions_count > 0) || data.twitter_running || twitterCompleted
-  const redditEnabled = (data.reddit_actions_count > 0) || data.reddit_running || redditCompleted
-  
-  // 如果没有任何平台被启用，返回 false
-  if (!twitterEnabled && !redditEnabled) return false
-  
-  // 检查所有启用的平台是否都已完成
-  if (twitterEnabled && !twitterCompleted) return false
-  if (redditEnabled && !redditCompleted) return false
-  
-  return true
-}
-
 const fetchRunStatusDetail = async () => {
   if (!props.simulationId) return
   
@@ -569,7 +545,6 @@ const fetchRunStatusDetail = async () => {
       const serverActions = res.data.all_actions || []
       
       // 增量添加新动作（去重）
-      let newActionsAdded = 0
       serverActions.forEach(action => {
         // 生成唯一ID
         const actionId = action.id || `${action.timestamp}-${action.platform}-${action.agent_id}-${action.action_type}`
@@ -580,9 +555,15 @@ const fetchRunStatusDetail = async () => {
             ...action,
             _uniqueId: actionId
           })
-          newActionsAdded++
         }
       })
+      
+      // 限制动作列表大小，防止内存泄漏
+      const MAX_ACTIONS = 1000
+      if (allActions.value.length > MAX_ACTIONS) {
+        const removed = allActions.value.splice(0, allActions.value.length - MAX_ACTIONS)
+        removed.forEach(a => actionIds.value.delete(a._uniqueId))
+      }
       
       // 不自动滚动，让用户自由查看时间轴
       // 新动作会在底部追加

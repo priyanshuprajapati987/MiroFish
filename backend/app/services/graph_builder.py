@@ -4,11 +4,14 @@
 """
 
 import hashlib
+import logging
 import uuid
 import time
 import threading
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 from zep_cloud import BatchAddItem, EntityEdgeSourceTarget, NotFoundError
 
@@ -219,7 +222,7 @@ class GraphBuilderService:
         self,
         name: str,
         *,
-        graph_id: str | None = None,
+        graph_id: Optional[str] = None,
         graph_id_callback: Optional[Callable[[str], None]] = None,
     ) -> str:
         """Create a graph with a caller-durable ID and reconcile lost replies."""
@@ -262,7 +265,12 @@ class GraphBuilderService:
 
     @staticmethod
     def build_operation_id(graph_id: str, chunks: List[str]) -> str:
-        payload_hash = hashlib.sha256("\0".join(chunks).encode("utf-8")).hexdigest()
+        h = hashlib.sha256()
+        for idx, chunk in enumerate(chunks):
+            if idx > 0:
+                h.update(b"\0")
+            h.update(chunk.encode("utf-8"))
+        payload_hash = h.hexdigest()
         return hashlib.sha256(
             f"{graph_id}:{payload_hash}".encode("utf-8")
         ).hexdigest()
@@ -330,7 +338,9 @@ class GraphBuilderService:
         # 动态创建实体类型
         entity_types = {}
         for entity_def in ontology.get("entity_types", [])[:MAX_ONTOLOGY_TYPES]:
-            name = entity_def["name"]
+            name = entity_def.get("name")
+            if not name:
+                continue
             description = entity_def.get("description", f"A {name} entity.")
             
             # 创建属性字典和类型注解（Pydantic v2 需要）
@@ -401,7 +411,7 @@ class GraphBuilderService:
                 # Zep iterates entities.items(), so edge-only ontologies must
                 # pass an empty dictionary rather than None.
                 entities=entity_types,
-                edges=edge_definitions if edge_definitions else None,
+                edges=edge_definitions if edge_definitions else {},
             )
     
     def add_text_batches(
@@ -676,7 +686,16 @@ class GraphBuilderService:
                 item for item in items
                 if getattr(item, "status", None) not in {"succeeded", "skipped"}
             ]
+            failed_details = []
+            for item in failed_items[:5]:
+                item_id = getattr(item, "id", "unknown")
+                item_error = getattr(item, "error", "unknown error")
+                failed_details.append(f"{item_id}: {item_error}")
             first_error = getattr(failed_items[0], "error", None) if failed_items else None
+            logger.error(
+                f"Zep batch {submission.batch_id} ended as {status}; "
+                f"failed_items={len(failed_items)}; details={failed_details}"
+            )
             raise RuntimeError(
                 f"Zep batch {submission.batch_id} ended as {status}; "
                 f"failed_items={len(failed_items)}; first_error={first_error}"
@@ -752,7 +771,7 @@ class GraphBuilderService:
             # 检查每个 episode 的处理状态
             for ep_uuid in list(pending_episodes):
                 episode = call_zep_read_with_retry(
-                    lambda: self.client.graph.episode.get(uuid_=ep_uuid),
+                    lambda ep=ep_uuid: self.client.graph.episode.get(uuid_=ep),
                     operation_name=f"poll episode {ep_uuid}",
                 )
                 is_processed = getattr(episode, 'processed', False)

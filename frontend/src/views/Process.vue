@@ -439,6 +439,7 @@ const isFullScreen = ref(false)
 // DOM引用
 const graphContainer = ref(null)
 const graphSvg = ref(null)
+let graphSim = null
 
 // 轮询定时器
 let pollTimer = null
@@ -963,6 +964,8 @@ const renderGraph = () => {
     .force('x', d3.forceX(width / 2).strength(0.05))
     .force('y', d3.forceY(height / 2).strength(0.05))
   
+  graphSim = simulation
+  
   // 添加缩放功能
   const g = svg.append('g')
   
@@ -1095,6 +1098,11 @@ onMounted(() => {
 onUnmounted(() => {
   stopPolling()
   stopGraphPolling()
+  // Stop D3 simulation to prevent memory leak
+  if (graphSim) {
+    graphSim.stop()
+    graphSim = null
+  }
 })
 </script>
 

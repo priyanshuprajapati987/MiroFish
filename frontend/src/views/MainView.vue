@@ -77,7 +77,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import GraphPanel from '../components/GraphPanel.vue'
@@ -303,31 +303,8 @@ const startBuildGraph = async () => {
   }
 }
 
-const startGraphPolling = () => {
-  addLog('Started polling for graph data...')
-  fetchGraphData()
-  graphPollTimer = setInterval(fetchGraphData, 10000)
-}
-
-const fetchGraphData = async () => {
-  try {
-    // Refresh project info to check for graph_id
-    const projRes = await getProject(currentProjectId.value)
-    if (projRes.success && projRes.data.graph_id) {
-      const gRes = await getGraphData(projRes.data.graph_id)
-      if (gRes.success) {
-        graphData.value = gRes.data
-        const nodeCount = gRes.data.node_count || gRes.data.nodes?.length || 0
-        const edgeCount = gRes.data.edge_count || gRes.data.edges?.length || 0
-        addLog(`Graph data refreshed. Nodes: ${nodeCount}, Edges: ${edgeCount}`)
-      }
-    }
-  } catch (err) {
-    console.warn('Graph fetch error:', err)
-  }
-}
-
 const startPollingTask = (taskId) => {
+  stopPolling()
   pollTaskStatus(taskId)
   pollTimer = setInterval(() => pollTaskStatus(taskId), 2000)
 }

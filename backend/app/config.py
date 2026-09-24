@@ -18,7 +18,10 @@ class Config:
     """Flask配置类"""
     
     # Flask配置
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'mirofish-secret-key')
+    SECRET_KEY = os.environ.get('SECRET_KEY') or os.environ.get('FLASK_SECRET', 'dev-secret-change-in-prod')
+# 在生产环境必须设置 SECRET_KEY 环境变量，否则 session 在重启时会失效
+if os.environ.get('FLASK_ENV') == 'production' and SECRET_KEY == 'dev-secret-change-in-prod':
+    raise RuntimeError('SECRET_KEY must be set in production')
     DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     
     # JSON配置 - 禁用ASCII转义，让中文直接显示
@@ -35,7 +38,7 @@ class Config:
     
     # 文件上传配置
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '../uploads')
+    UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '../uploads'))
     ALLOWED_EXTENSIONS = {'pdf', 'md', 'txt', 'markdown'}
     
     # 文本处理配置
@@ -57,9 +60,21 @@ class Config:
     ]
     
     # Report Agent配置
-    REPORT_AGENT_MAX_TOOL_CALLS = int(os.environ.get('REPORT_AGENT_MAX_TOOL_CALLS', '5'))
-    REPORT_AGENT_MAX_REFLECTION_ROUNDS = int(os.environ.get('REPORT_AGENT_MAX_REFLECTION_ROUNDS', '2'))
-    REPORT_AGENT_TEMPERATURE = float(os.environ.get('REPORT_AGENT_TEMPERATURE', '0.5'))
+    def _int_env(key, default):
+    val = os.environ.get(key)
+    if val is None: return default
+    try: return int(val)
+    except (ValueError, TypeError): return default
+
+def _float_env(key, default):
+    val = os.environ.get(key)
+    if val is None: return default
+    try: return float(val)
+    except (ValueError, TypeError): return default
+
+REPORT_AGENT_MAX_TOOL_CALLS = _int_env('REPORT_AGENT_MAX_TOOL_CALLS', 5)
+    REPORT_AGENT_MAX_REFLECTION_ROUNDS = _int_env('REPORT_AGENT_MAX_REFLECTION_ROUNDS', 2)
+    REPORT_AGENT_TEMPERATURE = _float_env('REPORT_AGENT_TEMPERATURE', 0.5)
     
     @classmethod
     def validate(cls) -> list[str]:

@@ -93,7 +93,7 @@ const viewMode = ref('split')
 // Data State
 const currentSimulationId = ref(route.params.simulationId)
 // 直接在初始化时从 query 参数获取 maxRounds，确保子组件能立即获取到值
-const maxRounds = ref(route.query.maxRounds ? parseInt(route.query.maxRounds) : null)
+const maxRounds = ref(route.query.maxRounds ? parseInt(route.query.maxRounds, 10) : null)
 const minutesPerRound = ref(30) // 默认每轮30分钟
 const projectData = ref(null)
 const graphData = ref(null)
@@ -129,7 +129,8 @@ const isSimulating = computed(() => currentStatus.value === 'processing')
 
 // --- Helpers ---
 const addLog = (msg) => {
-  const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '.' + new Date().getMilliseconds().toString().padStart(3, '0')
+  const now = new Date()
+  const time = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '.' + now.getMilliseconds().toString().padStart(3, '0')
   systemLogs.value.push({ time, msg })
   if (systemLogs.value.length > 200) {
     systemLogs.value.shift()
@@ -279,7 +280,7 @@ let graphRefreshTimer = null
 const startGraphRefresh = () => {
   if (graphRefreshTimer) return
   addLog(t('log.graphRealtimeRefreshStart'))
-  // 立即刷新一次，然后每30秒刷新
+  refreshGraph()
   graphRefreshTimer = setInterval(refreshGraph, 30000)
 }
 

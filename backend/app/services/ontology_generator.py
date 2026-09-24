@@ -241,7 +241,10 @@ class OntologyGenerator:
             max_tokens=None,
             max_attempts=2,
         )
-        
+
+        if result is None:
+            raise ValueError("LLM返回空响应，无法生成本体")
+
         # 验证和后处理
         result = self._validate_and_process(result)
         
@@ -304,7 +307,7 @@ class OntologyGenerator:
 
         chunks = self._collect_document_chunks(document_texts)
         if not chunks:
-            return ""
+            raise ValueError("文档内容为空，无法生成本体")
 
         selected_chunks = self._select_representative_chunks(chunks)
         excerpt_budget = self._calculate_excerpt_budget(len(selected_chunks))
@@ -648,38 +651,46 @@ class OntologyGenerator:
             '',
         ]
         
-        # 生成实体类型
-        for entity in ontology.get("entity_types", []):
-            name = entity["name"]
-            desc = entity.get("description", f"A {name} entity.")
-            
-            code_lines.append(f'class {name}(EntityModel):')
-            code_lines.append(f'    """{desc}"""')
-            
-            attrs = entity.get("attributes", [])
-            if attrs:
-                for attr in attrs:
-                    attr_name = attr["name"]
-                    attr_desc = attr.get("description", attr_name)
-                    code_lines.append(f'    {attr_name}: EntityText = Field(')
-                    code_lines.append(f'        description="{attr_desc}",')
-                    code_lines.append(f'        default=None')
-                    code_lines.append(f'    )')
-            else:
-                code_lines.append('    pass')
-            
-            code_lines.append('')
-            code_lines.append('')
-        
-        code_lines.append('# ============== 关系类型定义 ==============')
-        code_lines.append('')
-        
-        # 生成关系类型
-        for edge in ontology.get("edge_types", []):
-            name = edge["name"]
-            # 转换为PascalCase类名
-            class_name = ''.join(word.capitalize() for word in name.split('_'))
-            desc = edge.get("description", f"A {name} relationship.")
+import re as _re
+def _safe_name(name):
+    s = _re.sub(r'\W|^(?=\d)', '_', name.strip()).strip('_')
+    return s or 'Entity'
+
+for entity in ontology.get("entity_types", []):
+    name = entity["name"]
+    desc = entity.get("description", f"A {name} entity.")
+    safe_name = _safe_name(name)
+    
+    code_lines.append(f'class {safe_name}(EntityModel):')
+    code_lines.append(f'    """{desc}"""')
+    
+    attrs = entity.get("attributes", [])
+    if attrs:
+        for attr in attrs:
+            attr_name = attr["name"]
+            # 防止代码注入：验证属性名
+            if not _re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', attr_name):
+                attr_name = _re.sub(r'\W|^(?=\d)', '_', attr_name).strip('_')
+            attr_desc = attr.get("description", attr_name)
+            safe_desc = attr_desc.replace('\\', '\\\\').replace('"', '\\"')
+            code_lines.append(f'    {attr_name}: EntityText = Field(')
+            code_lines.append(f'        description="{safe_desc}",')
+            code_lines.append(f'        default=None')
+            code_lines.append(f'    )')
+    else:
+        code_lines.append('    pass')
+    
+    code_lines.append('')
+    code_lines.append('')
+
+code_lines.append('# ============== 关系类型定义 ==============')
+code_lines.append('')
+
+# 生成关系类型
+for edge in ontology.get("edge_types", []):
+    name = edge["name"]
+    class_name = _safe_name(name)
+    desc = edge.get("description", f"A {name} relationship.")
             
             code_lines.append(f'class {class_name}(EdgeModel):')
             code_lines.append(f'    """{desc}"""')
@@ -689,8 +700,9 @@ class OntologyGenerator:
                 for attr in attrs:
                     attr_name = attr["name"]
                     attr_desc = attr.get("description", attr_name)
+                    safe_desc = attr_desc.replace('\\', '\\\\').replace('"', '\\"')
                     code_lines.append(f'    {attr_name}: EntityText = Field(')
-                    code_lines.append(f'        description="{attr_desc}",')
+                    code_lines.append(f'        description="{safe_desc}",')
                     code_lines.append(f'        default=None')
                     code_lines.append(f'    )')
             else:
@@ -723,7 +735,7 @@ class OntologyGenerator:
             source_targets = edge.get("source_targets", [])
             if source_targets:
                 st_list = ', '.join([
-                    f'{{"source": "{st.get("source", "Entity")}", "target": "{st.get("target", "Entity")}"}}'
+                    f'{{"source": "{st.get("source", "Entity").replace(chr(34), chr(39))}", "target": "{st.get("target", "Entity").replace(chr(34), chr(39))}"}}'
                     for st in source_targets
                 ])
                 code_lines.append(f'    "{name}": [{st_list}],')

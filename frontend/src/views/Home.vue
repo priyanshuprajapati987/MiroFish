@@ -274,10 +274,15 @@ const handleDrop = (e) => {
 
 // 添加文件
 const addFiles = (newFiles) => {
-  const validFiles = newFiles.filter(file => {
+  const existingNames = new Set(files.value.map(f => f.name))
+  const validFiles = []
+  for (const file of newFiles) {
     const ext = file.name.split('.').pop().toLowerCase()
-    return ['pdf', 'md', 'txt'].includes(ext)
-  })
+    if (['pdf', 'md', 'txt'].includes(ext) && !existingNames.has(file.name)) {
+      validFiles.push(file)
+      existingNames.add(file.name)
+    }
+  }
   files.value.push(...validFiles)
 }
 
@@ -311,8 +316,8 @@ const startSimulation = () => {
 }
 </script>
 
-<style scoped>
-/* 全局变量与重置 */
+<style>
+/* 全局变量（不可scoped） */
 :root {
   --black: #000000;
   --white: #FFFFFF;
@@ -320,15 +325,13 @@ const startSimulation = () => {
   --gray-light: #F5F5F5;
   --gray-text: #666666;
   --border: #E5E5E5;
-  /* 
-    使用 Space Grotesk 作为主要标题字体，JetBrains Mono 作为代码/标签字体
-    确保已在 index.html 引入这些 Google Fonts 
-  */
   --font-mono: 'JetBrains Mono', monospace;
   --font-sans: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
   --font-cn: 'Noto Sans SC', system-ui, sans-serif;
 }
+</style>
 
+<style scoped>
 .home-container {
   min-height: 100vh;
   background: var(--white);

@@ -243,7 +243,7 @@ const props = defineProps({
   graphData: Object,
   loading: Boolean,
   currentPhase: Number,
-  isSimulating: Boolean
+  isSimulating: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['refresh', 'toggle-maximize'])
@@ -334,8 +334,9 @@ const renderGraph = () => {
   }
   
   const container = graphContainer.value
-  const width = container.clientWidth
-  const height = container.clientHeight
+  const width = container.clientWidth || 800
+  const height = container.clientHeight || 600
+  if (width === 0 || height === 0) return
   
   const svg = d3.select(graphSvg.value)
     .attr('width', width)
@@ -488,7 +489,8 @@ const renderGraph = () => {
 
   const g = svg.append('g')
   
-  // Zoom
+  // Zoom - clean up old listeners first
+  svg.on('.zoom', null)
   svg.call(d3.zoom().extent([[0, 0], [width, height]]).scaleExtent([0.1, 4]).on('zoom', (event) => {
     g.attr('transform', event.transform)
   }))
@@ -659,6 +661,7 @@ const renderGraph = () => {
     .attr('stroke', '#fff')
     .attr('stroke-width', 2.5)
     .style('cursor', 'pointer')
+    .on('.drag', null) // clean up old drag listeners
     .call(d3.drag()
       .on('start', (event, d) => {
         // 只记录位置，不重启仿真（区分点击和拖拽）
@@ -783,9 +786,19 @@ const renderGraph = () => {
   })
 }
 
-watch(() => props.graphData, () => {
-  nextTick(renderGraph)
-}, { deep: true })
+watch(() => {
+  const d = props.graphData
+  if (!d) return null
+  return {
+    nodeCount: d.nodes?.length ?? 0,
+    edgeCount: d.edges?.length ?? 0,
+    version: d._version ?? d.nodes?.length ?? 0
+  }
+}, (newVal, oldVal) => {
+  if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
+    nextTick(renderGraph)
+  }
+})
 
 // 监听边标签显示开关
 watch(showEdgeLabels, (newVal) => {

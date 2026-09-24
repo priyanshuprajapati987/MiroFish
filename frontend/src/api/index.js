@@ -51,8 +51,12 @@ service.interceptors.response.use(
 
     // Axios rejects non-2xx responses before the success interceptor can
     // surface the backend's safe, actionable error message.
-    if (typeof apiError === 'string' && apiError) {
-      error.message = apiError
+    if (apiError) {
+      if (typeof apiError === 'string') {
+        error.message = apiError
+      } else if (typeof apiError === 'object') {
+        error.message = apiError.message || JSON.stringify(apiError)
+      }
     }
     
     return Promise.reject(error)

@@ -143,10 +143,20 @@ class SimulationIPCClient:
             args=args
         )
         
-        # 写入命令文件
+        # 写入命令文件（原子写入）
         command_file = os.path.join(self.commands_dir, f"{command_id}.json")
-        with open(command_file, 'w', encoding='utf-8') as f:
-            json.dump(command.to_dict(), f, ensure_ascii=False, indent=2)
+        import tempfile
+        fd, tmp_path = tempfile.mkstemp(dir=self.commands_dir, suffix='.tmp')
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                json.dump(command.to_dict(), f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, command_file)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
         
         logger.info(f"发送IPC命令: {command_type.value}, command_id={command_id}")
         
@@ -162,11 +172,11 @@ class SimulationIPCClient:
                     response = IPCResponse.from_dict(response_data)
                     
                     # 清理命令和响应文件
-                    try:
-                        os.remove(command_file)
-                        os.remove(response_file)
-                    except OSError:
-                        pass
+                    for path in (command_file, response_file):
+                        try:
+                            os.remove(path)
+                        except OSError:
+                            pass
                     
                     logger.info(f"收到IPC响应: command_id={command_id}, status={response.status.value}")
                     return response
@@ -321,13 +331,23 @@ class SimulationIPCServer:
         self._update_env_status("stopped")
     
     def _update_env_status(self, status: str):
-        """更新环境状态文件"""
+        """更新环境状态文件（原子写入）"""
+        import tempfile
         status_file = os.path.join(self.simulation_dir, "env_status.json")
-        with open(status_file, 'w', encoding='utf-8') as f:
-            json.dump({
-                "status": status,
-                "timestamp": datetime.now().isoformat()
-            }, f, ensure_ascii=False, indent=2)
+        fd, tmp_path = tempfile.mkstemp(dir=self.simulation_dir, suffix='.tmp')
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                json.dump({
+                    "status": status,
+                    "timestamp": datetime.now().isoformat()
+                }, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, status_file)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
     
     def poll_commands(self) -> Optional[IPCCommand]:
         """
@@ -344,7 +364,10 @@ class SimulationIPCServer:
         for filename in os.listdir(self.commands_dir):
             if filename.endswith('.json'):
                 filepath = os.path.join(self.commands_dir, filename)
-                command_files.append((filepath, os.path.getmtime(filepath)))
+                try:
+                    command_files.append((filepath, os.path.getmtime(filepath)))
+                except OSError:
+                    continue
         
         command_files.sort(key=lambda x: x[1])
         
@@ -355,6 +378,10 @@ class SimulationIPCServer:
                 return IPCCommand.from_dict(data)
             except (json.JSONDecodeError, KeyError, OSError) as e:
                 logger.warning(f"读取命令文件失败: {filepath}, {e}")
+                try:
+                    os.remove(filepath)
+                except OSError:
+                    pass
                 continue
         
         return None
@@ -367,8 +394,18 @@ class SimulationIPCServer:
             response: IPC响应
         """
         response_file = os.path.join(self.responses_dir, f"{response.command_id}.json")
-        with open(response_file, 'w', encoding='utf-8') as f:
-            json.dump(response.to_dict(), f, ensure_ascii=False, indent=2)
+        import tempfile
+        fd, tmp_path = tempfile.mkstemp(dir=self.responses_dir, suffix='.tmp')
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                json.dump(response.to_dict(), f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, response_file)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
         
         # 删除命令文件
         command_file = os.path.join(self.commands_dir, f"{response.command_id}.json")

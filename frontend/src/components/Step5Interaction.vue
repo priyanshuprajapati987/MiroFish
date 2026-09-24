@@ -297,6 +297,7 @@
               :disabled="isSending || (!selectedAgent && chatTarget === 'agent')"
               rows="1"
               ref="chatInputRef"
+              :aria-label="$t('step5.chatInputPlaceholder')"
             ></textarea>
             <button 
               class="send-btn"
@@ -360,6 +361,7 @@
                 class="survey-input"
                 :placeholder="$t('step5.surveyInputPlaceholder')"
                 rows="3"
+                :aria-label="$t('step5.surveyInputPlaceholder')"
               ></textarea>
             </div>
 
@@ -480,13 +482,6 @@ const toggleSectionCollapse = (idx) => {
   collapsedSections.value = newSet
 }
 
-const selectChatTarget = (target) => {
-  chatTarget.value = target
-  if (target === 'report_agent') {
-    showAgentDropdown.value = false
-  }
-}
-
 // 保存当前对话记录到缓存
 const saveChatHistory = () => {
   if (chatHistory.value.length === 0) return
@@ -556,9 +551,15 @@ const formatTime = (timestamp) => {
 
 const renderMarkdown = (content) => {
   if (!content) return ''
-  
+  const escapeHtml = (str) => {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+  }
   let processedContent = content.replace(/^##\s+.+\n+/, '')
-  let html = processedContent.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="code-block"><code>$2</code></pre>')
+  let html = escapeHtml(processedContent)
+  html = html.replace(/&lt;pre&gt;&lt;code&gt;([\s\S]*?)&lt;\/code&gt;&lt;\/pre&gt;/g, '<pre class="code-block"><code>$1</code></pre>')
+  html = html.replace(/&lt;code&gt;([^&]+)&lt;\/code&gt;/g, '<code class="inline-code">$1</code>')
+  html = html.replace(/&lt;h5&gt;(.+?)&lt;\/h5&gt;/gm, '<h5 class="md-h5">$1</h5>')
   html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
   html = html.replace(/^#### (.+)$/gm, '<h5 class="md-h5">$1</h5>')
   html = html.replace(/^### (.+)$/gm, '<h4 class="md-h4">$1</h4>')
@@ -654,6 +655,9 @@ const sendMessage = async () => {
     content: message,
     timestamp: new Date().toISOString()
   })
+  if (chatHistory.value.length > 100) {
+    chatHistory.value = chatHistory.value.slice(-100)
+  }
   
   scrollToBottom()
   isSending.value = true
@@ -722,7 +726,7 @@ const sendToAgent = async (message) => {
     const historyContext = chatHistory.value
       .slice(0, -1)
       .slice(-6)
-      .map(msg => `${msg.role === 'user' ? '提问者' : '你'}：${msg.content}`)
+      .map(msg => `${msg.role === 'user' ? $t('step5.user') : $t('step5.agent')}：${msg.content}`)
       .join('\n')
     prompt = `以下是我们之前的对话：\n${historyContext}\n\n现在我的新问题是：${message}`
   }
@@ -939,8 +943,6 @@ const handleClickOutside = (e) => {
 // Lifecycle
 onMounted(() => {
   addLog(t('log.step5Init'))
-  loadReportData()
-  loadProfiles()
   document.addEventListener('click', handleClickOutside)
 })
 

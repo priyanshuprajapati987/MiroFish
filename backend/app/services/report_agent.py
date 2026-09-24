@@ -307,15 +307,18 @@ class ReportLogger:
 class ReportConsoleLogger:
     """
     Report Agent 控制台日志记录器
-    
+
     将控制台风格的日志（INFO、WARNING等）写入报告文件夹中的 console_log.txt 文件。
     这些日志与 agent_log.jsonl 不同，是纯文本格式的控制台输出。
     """
-    
+
+    _handler_ref_count = 0
+    _attached_loggers: dict[str, list] = {}
+
     def __init__(self, report_id: str):
         """
         初始化控制台日志记录器
-        
+
         Args:
             report_id: 报告ID，用于确定日志文件路径
         """
@@ -326,16 +329,16 @@ class ReportConsoleLogger:
         self._ensure_log_file()
         self._file_handler = None
         self._setup_file_handler()
-    
+
     def _ensure_log_file(self):
         """确保日志文件所在目录存在"""
         log_dir = os.path.dirname(self.log_file_path)
         os.makedirs(log_dir, exist_ok=True)
-    
+
     def _setup_file_handler(self):
         """设置文件处理器，将日志同时写入文件"""
         import logging
-        
+
         # 创建文件处理器
         self._file_handler = logging.FileHandler(
             self.log_file_path,
@@ -343,43 +346,45 @@ class ReportConsoleLogger:
             encoding='utf-8'
         )
         self._file_handler.setLevel(logging.INFO)
-        
+
         # 使用与控制台相同的简洁格式
         formatter = logging.Formatter(
             '[%(asctime)s] %(levelname)s: %(message)s',
             datefmt='%H:%M:%S'
         )
         self._file_handler.setFormatter(formatter)
-        
+
         # 添加到 report_agent 相关的 logger
         loggers_to_attach = [
             'mirofish.report_agent',
             'mirofish.zep_tools',
         ]
-        
+
+        ReportConsoleLogger._handler_ref_count += 1
+
         for logger_name in loggers_to_attach:
             target_logger = logging.getLogger(logger_name)
             # 避免重复添加
             if self._file_handler not in target_logger.handlers:
                 target_logger.addHandler(self._file_handler)
+                ReportConsoleLogger._attached_loggers.setdefault(
+                    logger_name, []
+                ).append(self._file_handler)
     
     def close(self):
         """关闭文件处理器并从 logger 中移除"""
         import logging
-        
+
         if self._file_handler:
-            loggers_to_detach = [
-                'mirofish.report_agent',
-                'mirofish.zep_tools',
-            ]
-            
+            ReportConsoleLogger._handler_ref_count = max(0, ReportConsoleLogger._handler_ref_count - 1)
+            loggers_to_detach = ['mirofish.report_agent', 'mirofish.zep_tools']
             for logger_name in loggers_to_detach:
                 target_logger = logging.getLogger(logger_name)
                 if self._file_handler in target_logger.handlers:
                     target_logger.removeHandler(self._file_handler)
-            
             self._file_handler.close()
             self._file_handler = None
+            ReportConsoleLogger._attached_loggers.clear()
     
     def __del__(self):
         """析构时确保关闭文件处理器"""
@@ -1003,7 +1008,10 @@ class ReportAgent:
                 query = parameters.get("query", "")
                 limit = parameters.get("limit", 10)
                 if isinstance(limit, str):
-                    limit = int(limit)
+                    try:
+                        limit = int(limit)
+                    except (TypeError, ValueError):
+                        limit = 10
                 result = self.zep_tools.quick_search(
                     graph_id=self.graph_id,
                     query=query,
@@ -1016,7 +1024,10 @@ class ReportAgent:
                 interview_topic = parameters.get("interview_topic", parameters.get("query", ""))
                 max_agents = parameters.get("max_agents", 5)
                 if isinstance(max_agents, str):
-                    max_agents = int(max_agents)
+                    try:
+                        max_agents = int(max_agents)
+                    except (TypeError, ValueError):
+                        max_agents = 5
                 max_agents = min(max_agents, 10)
                 result = self.zep_tools.interview_agents(
                     simulation_id=self.simulation_id,
@@ -1873,7 +1884,14 @@ class ReportAgent:
                 messages=messages,
                 temperature=0.5
             )
-            
+
+            if response is None:
+                return {
+                    "response": "抱歉，生成回复时出现错误，请重试。",
+                    "tool_calls": tool_calls_made,
+                    "sources": []
+                }
+
             # 解析工具调用
             tool_calls = self._parse_tool_calls(response)
             
@@ -1915,7 +1933,10 @@ class ReportAgent:
             messages=messages,
             temperature=0.5
         )
-        
+
+        if final_response is None:
+            final_response = "抱歉，生成回复时出现错误，请重试。"
+
         # 清理响应
         clean_response = re.sub(r'<tool_call>.*?</tool_call>', '', final_response, flags=re.DOTALL)
         clean_response = re.sub(r'\[TOOL_CALL\].*?\)', '', clean_response)
@@ -2304,7 +2325,10 @@ class ReportManager:
 
                 # 从文件名解析章节索引
                 parts = filename.replace('.md', '').split('_')
-                section_index = int(parts[1])
+                try:
+                    section_index = int(parts[1])
+                except (IndexError, ValueError):
+                    section_index = 0
 
                 sections.append({
                     "filename": filename,
@@ -2530,12 +2554,17 @@ class ReportManager:
                 with open(full_report_path, 'r', encoding='utf-8') as f:
                     markdown_content = f.read()
         
+        try:
+            status = ReportStatus(data['status'])
+        except (ValueError, KeyError):
+            status = ReportStatus.FAILED
+        
         return Report(
             report_id=data['report_id'],
             simulation_id=data['simulation_id'],
             graph_id=data['graph_id'],
             simulation_requirement=data['simulation_requirement'],
-            status=ReportStatus(data['status']),
+            status=status,
             outline=outline,
             markdown_content=markdown_content,
             created_at=data.get('created_at', ''),
@@ -2600,7 +2629,11 @@ class ReportManager:
         
         # 新格式：删除整个文件夹
         if os.path.exists(folder_path) and os.path.isdir(folder_path):
-            shutil.rmtree(folder_path)
+            try:
+                shutil.rmtree(folder_path)
+            except OSError:
+                logger.warning(t('report.reportFolderDeleteFailed', reportId=report_id))
+                return False
             logger.info(t('report.reportFolderDeleted', reportId=report_id))
             return True
         

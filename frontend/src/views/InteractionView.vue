@@ -204,17 +204,19 @@ const refreshGraph = () => {
   }
 }
 
-// Watch route params
+onMounted(() => {
+  addLog(t('log.interactionViewInit'))
+  if (route.params.reportId) {
+    currentReportId.value = route.params.reportId
+    loadReportData()
+  }
+})
+
 watch(() => route.params.reportId, (newId) => {
   if (newId && newId !== currentReportId.value) {
     currentReportId.value = newId
     loadReportData()
   }
-}, { immediate: true })
-
-onMounted(() => {
-  addLog(t('log.interactionViewInit'))
-  loadReportData()
 })
 </script>
 

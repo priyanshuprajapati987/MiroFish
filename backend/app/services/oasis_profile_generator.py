@@ -627,24 +627,42 @@ class OasisProfileGenerator:
     def _fix_truncated_json(self, content: str) -> str:
         """修复被截断的JSON（输出被max_tokens限制截断）"""
         import re
-        
-        # 如果JSON被截断，尝试闭合它
+
+        if not content:
+            return content
+
         content = content.strip()
-        
-        # 计算未闭合的括号
-        open_braces = content.count('{') - content.count('}')
-        open_brackets = content.count('[') - content.count(']')
-        
-        # 检查是否有未闭合的字符串
-        # 简单检查：如果最后一个引号后没有逗号或闭合括号，可能是字符串被截断
-        if content and content[-1] not in '",}]':
-            # 尝试闭合字符串
+
+        in_string = False
+        escaped = False
+        open_braces = 0
+        open_brackets = 0
+        for ch in content:
+            if escaped:
+                escaped = False
+                continue
+            if ch == '\\':
+                escaped = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if not in_string:
+                if ch == '{':
+                    open_braces += 1
+                elif ch == '}':
+                    open_braces -= 1
+                elif ch == '[':
+                    open_brackets += 1
+                elif ch == ']':
+                    open_brackets -= 1
+
+        if in_string:
             content += '"'
-        
-        # 闭合括号
-        content += ']' * open_brackets
-        content += '}' * open_braces
-        
+
+        content += ']' * max(open_brackets, 0)
+        content += '}' * max(open_braces, 0)
+
         return content
     
     def _try_fix_json(self, content: str, entity_name: str, entity_type: str, entity_summary: str = "") -> Dict[str, Any]:
@@ -687,7 +705,7 @@ class OasisProfileGenerator:
                     result = json.loads(json_str)
                     result["_fixed"] = True
                     return result
-                except:
+                except Exception:
                     pass
         
         # 6. 尝试从内容中提取部分信息

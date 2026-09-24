@@ -6,6 +6,7 @@
 import os
 import sys
 import logging
+import threading
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
@@ -26,6 +27,8 @@ def _ensure_utf8_stdout():
 # 日志目录
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'logs')
 
+
+_setup_lock = threading.Lock()
 
 def setup_logger(name: str = 'mirofish', level: int = logging.DEBUG) -> logging.Logger:
     """
@@ -48,42 +51,43 @@ def setup_logger(name: str = 'mirofish', level: int = logging.DEBUG) -> logging.
     # 阻止日志向上传播到根 logger，避免重复输出
     logger.propagate = False
     
-    # 如果已经有处理器，不重复添加
-    if logger.handlers:
-        return logger
-    
-    # 日志格式
-    detailed_formatter = logging.Formatter(
-        '[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    
-    simple_formatter = logging.Formatter(
-        '[%(asctime)s] %(levelname)s: %(message)s',
-        datefmt='%H:%M:%S'
-    )
-    
-    # 1. 文件处理器 - 详细日志（按日期命名，带轮转）
-    log_filename = datetime.now().strftime('%Y-%m-%d') + '.log'
-    file_handler = RotatingFileHandler(
-        os.path.join(LOG_DIR, log_filename),
-        maxBytes=10 * 1024 * 1024,  # 10MB
-        backupCount=5,
-        encoding='utf-8'
-    )
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(detailed_formatter)
-    
-    # 2. 控制台处理器 - 简洁日志（INFO及以上）
-    # 确保 Windows 下使用 UTF-8 编码，避免中文乱码
-    _ensure_utf8_stdout()
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(simple_formatter)
-    
-    # 添加处理器
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+    # 线程安全地检查和添加 handlers
+    with _setup_lock:
+        if logger.handlers:
+            return logger
+        
+        # 日志格式
+        detailed_formatter = logging.Formatter(
+            '[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        
+        simple_formatter = logging.Formatter(
+            '[%(asctime)s] %(levelname)s: %(message)s',
+            datefmt='%H:%M:%S'
+        )
+        
+        # 1. 文件处理器 - 详细日志（按日期命名，带轮转）
+        log_filename = datetime.now().strftime('%Y-%m-%d') + '.log'
+        file_handler = RotatingFileHandler(
+            os.path.join(LOG_DIR, log_filename),
+            maxBytes=10 * 1024 * 1024,  # 10MB
+            backupCount=5,
+            encoding='utf-8'
+        )
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(detailed_formatter)
+        
+        # 2. 控制台处理器 - 简洁日志（INFO及以上）
+        # 确保 Windows 下使用 UTF-8 编码，避免中文乱码
+        _ensure_utf8_stdout()
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(simple_formatter)
+        
+        # 添加处理器
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
     
     return logger
 

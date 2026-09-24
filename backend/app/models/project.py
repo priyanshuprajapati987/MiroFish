@@ -81,7 +81,10 @@ class Project:
         """从字典创建"""
         status = data.get('status', 'created')
         if isinstance(status, str):
-            status = ProjectStatus(status)
+            try:
+                status = ProjectStatus(status)
+            except ValueError:
+                status = ProjectStatus.CREATED
         
         return cls(
             project_id=data['project_id'],
@@ -195,8 +198,11 @@ class ProjectManager:
         if not os.path.exists(meta_path):
             return None
         
-        with open(meta_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return None
         
         return Project.from_dict(data)
     
@@ -250,8 +256,11 @@ class ProjectManager:
         if not os.path.exists(project_dir):
             return False
         
-        shutil.rmtree(project_dir)
-        return True
+        try:
+            shutil.rmtree(project_dir)
+            return True
+        except OSError:
+            return False
     
     @classmethod
     def save_file_to_project(cls, project_id: str, file_storage, original_filename: str) -> Dict[str, str]:

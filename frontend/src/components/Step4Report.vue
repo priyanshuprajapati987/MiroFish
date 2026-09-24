@@ -454,17 +454,6 @@ const toggleRawResult = (timestamp, event) => {
   }
 }
 
-const toggleSectionContent = (idx) => {
-  if (!generatedSections.value[idx + 1]) return
-  const newSet = new Set(expandedContent.value)
-  if (newSet.has(idx)) {
-    newSet.delete(idx)
-  } else {
-    newSet.add(idx)
-  }
-  expandedContent.value = newSet
-}
-
 const toggleSectionCollapse = (idx) => {
   // 只有已完成的章节才能折叠
   if (!generatedSections.value[idx + 1]) return
@@ -2033,6 +2022,10 @@ const fetchAgentLog = async () => {
       if (newLogs.length > 0) {
         newLogs.forEach(log => {
           agentLogs.value.push(log)
+          const MAX_AGENT_LOGS = 5000
+          if (agentLogs.value.length > MAX_AGENT_LOGS) {
+            agentLogs.value = agentLogs.value.slice(-MAX_AGENT_LOGS)
+          }
           
           if (log.action === 'planning_complete' && log.details?.outline) {
             reportOutline.value = log.details.outline
@@ -2140,6 +2133,10 @@ const fetchConsoleLog = async () => {
       
       if (newLogs.length > 0) {
         consoleLogs.value.push(...newLogs)
+        const MAX_LOGS = 2000
+        if (consoleLogs.value.length > MAX_LOGS) {
+          consoleLogs.value = consoleLogs.value.slice(-MAX_LOGS)
+        }
         consoleLogLine.value = res.data.from_line + newLogs.length
         
         nextTick(() => {
@@ -2155,7 +2152,7 @@ const fetchConsoleLog = async () => {
 }
 
 const startPolling = () => {
-  if (agentLogTimer || consoleLogTimer) return
+  stopPolling()
   
   fetchAgentLog()
   fetchConsoleLog()

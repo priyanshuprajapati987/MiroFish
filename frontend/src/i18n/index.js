@@ -7,7 +7,9 @@ const messages = {}
 const availableLocales = []
 
 for (const path in localeFiles) {
-  const key = path.match(/\/([^/]+)\.json$/)[1]
+  const match = path.match(/\/([^/]+)\.json$/)
+  if (!match) continue
+  const key = match[1]
   if (languages[key]) {
     messages[key] = localeFiles[path].default
     availableLocales.push({ key, label: languages[key].label })
@@ -15,10 +17,11 @@ for (const path in localeFiles) {
 }
 
 const savedLocale = localStorage.getItem('locale') || 'zh'
+const locale = availableLocales.some(l => l.key === savedLocale) ? savedLocale : 'zh'
 
 const i18n = createI18n({
   legacy: false,
-  locale: savedLocale,
+  locale,
   fallbackLocale: 'zh',
   messages
 })

@@ -484,20 +484,41 @@ class SimulationConfigGenerator:
     
     def _fix_truncated_json(self, content: str) -> str:
         """修复被截断的JSON"""
+        if not content:
+            return content
+
         content = content.strip()
-        
-        # 计算未闭合的括号
-        open_braces = content.count('{') - content.count('}')
-        open_brackets = content.count('[') - content.count(']')
-        
-        # 检查是否有未闭合的字符串
-        if content and content[-1] not in '",}]':
+
+        in_string = False
+        escaped = False
+        open_braces = 0
+        open_brackets = 0
+        for ch in content:
+            if escaped:
+                escaped = False
+                continue
+            if ch == '\\':
+                escaped = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if not in_string:
+                if ch == '{':
+                    open_braces += 1
+                elif ch == '}':
+                    open_braces -= 1
+                elif ch == '[':
+                    open_brackets += 1
+                elif ch == ']':
+                    open_brackets -= 1
+
+        if in_string:
             content += '"'
-        
-        # 闭合括号
-        content += ']' * open_brackets
-        content += '}' * open_braces
-        
+
+        content += ']' * max(open_brackets, 0)
+        content += '}' * max(open_braces, 0)
+
         return content
     
     def _try_fix_config_json(self, content: str) -> Optional[Dict[str, Any]]:
@@ -523,13 +544,13 @@ class SimulationConfigGenerator:
             
             try:
                 return json.loads(json_str)
-            except:
+            except Exception:
                 # 尝试移除所有控制字符
                 json_str = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', json_str)
                 json_str = re.sub(r'\s+', ' ', json_str)
                 try:
                     return json.loads(json_str)
-                except:
+                except Exception:
                     pass
         
         return None
@@ -876,7 +897,8 @@ class SimulationConfigGenerator:
 
         try:
             result = self._call_llm_with_retry(prompt, system_prompt)
-            llm_configs = {cfg["agent_id"]: cfg for cfg in result.get("agent_configs", [])}
+            agent_configs = result.get("agent_configs", []) if isinstance(result, dict) else []
+            llm_configs = {cfg["agent_id"]: cfg for cfg in agent_configs}
         except Exception as e:
             logger.warning(f"Agent配置批次LLM生成失败: {e}, 使用规则生成")
             llm_configs = {}

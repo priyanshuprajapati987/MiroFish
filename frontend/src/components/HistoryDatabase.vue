@@ -211,6 +211,8 @@ let observer = null
 let isAnimating = false  // 动画锁，防止闪烁
 let expandDebounceTimer = null  // 防抖定时器
 let pendingState = null  // 记录待执行的目标状态
+let observerInitTimer = null  // 观察器初始化定时器
+let pendingTimers = []  // 所有待处理的动画定时器
 
 // 卡片布局配置 - 调整为更宽的比例
 const CARDS_PER_ROW = 4
@@ -394,8 +396,9 @@ const truncateFilename = (filename, maxLength) => {
   if (filename.length <= maxLength) return filename
   
   const ext = filename.includes('.') ? '.' + filename.split('.').pop() : ''
+  const nameSlot = Math.max(1, maxLength - ext.length - 3)
   const nameWithoutExt = filename.slice(0, filename.length - ext.length)
-  const truncatedName = nameWithoutExt.slice(0, maxLength - ext.length - 3) + '...'
+  const truncatedName = nameWithoutExt.slice(0, nameSlot) + '...'
   return truncatedName + ext
 }
 
@@ -504,7 +507,7 @@ const initObserver = () => {
           pendingState = null
           
           // 动画完成后解除锁定，并检查是否有待处理的状态变化
-          setTimeout(() => {
+          const animTimer = setTimeout(() => {
             isAnimating = false
             
             // 动画结束后，检查是否有新的待执行状态
@@ -515,13 +518,15 @@ const initObserver = () => {
                   isAnimating = true
                   isExpanded.value = pendingState
                   pendingState = null
-                  setTimeout(() => {
+                  const innerTimer = setTimeout(() => {
                     isAnimating = false
                   }, 750)
+                  pendingTimers.push(innerTimer)
                 }
               }, 100)
             }
           }, 750)
+          pendingTimers.push(animTimer)
         }, delay)
       })
     },
@@ -552,7 +557,8 @@ onMounted(async () => {
   await loadHistory()
   
   // 等待 DOM 渲染后初始化观察器
-  setTimeout(() => {
+  observerInitTimer = setTimeout(() => {
+    observerInitTimer = null
     initObserver()
   }, 100)
 })
@@ -563,6 +569,11 @@ onActivated(() => {
 })
 
 onUnmounted(() => {
+  // 清理观察器初始化定时器
+  if (observerInitTimer) {
+    clearTimeout(observerInitTimer)
+    observerInitTimer = null
+  }
   // 清理 Intersection Observer
   if (observer) {
     observer.disconnect()
@@ -573,6 +584,9 @@ onUnmounted(() => {
     clearTimeout(expandDebounceTimer)
     expandDebounceTimer = null
   }
+  // 清理所有待处理的动画定时器
+  pendingTimers.forEach(t => clearTimeout(t))
+  pendingTimers = []
 })
 </script>
 

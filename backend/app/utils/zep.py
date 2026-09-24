@@ -118,7 +118,7 @@ def _retry_after_seconds(error: BaseException) -> float | None:
     if value is None:
         return None
     try:
-        return max(0.0, float(value))
+        return min(300.0, max(0.0, float(value)))
     except (TypeError, ValueError):
         return None
 

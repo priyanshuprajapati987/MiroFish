@@ -137,10 +137,10 @@ class SimulationManager:
     """
     
     # 模拟数据存储目录
-    SIMULATION_DATA_DIR = os.path.join(
+    SIMULATION_DATA_DIR = os.path.abspath(os.path.join(
         os.path.dirname(__file__), 
         '../../uploads/simulations'
-    )
+    ))
     
     def __init__(self):
         # 确保目录存在
@@ -162,15 +162,25 @@ class SimulationManager:
         
         state.updated_at = datetime.now().isoformat()
         
-        with open(state_file, 'w', encoding='utf-8') as f:
-            json.dump(state.to_dict(), f, ensure_ascii=False, indent=2)
+        # 原子写入：先写临时文件再替换
+        import shutil
+        tmp_file = state_file + ".tmp"
+        try:
+            with open(tmp_file, 'w', encoding='utf-8') as f:
+                json.dump(state.to_dict(), f, ensure_ascii=False, indent=2)
+            shutil.move(tmp_file, state_file)
+        except OSError:
+            if os.path.exists(tmp_file):
+                os.remove(tmp_file)
+            raise
         
         self._simulations[state.simulation_id] = state
     
     def _load_simulation_state(self, simulation_id: str) -> Optional[SimulationState]:
         """从文件加载模拟状态"""
-        if simulation_id in self._simulations:
-            return self._simulations[simulation_id]
+        with self._lock:
+            if simulation_id in self._simulations:
+                return self._simulations[simulation_id]
         
         sim_dir = self._get_simulation_dir(simulation_id)
         state_file = os.path.join(sim_dir, "state.json")

@@ -282,7 +282,9 @@
     "errorOccurred": "Sorry, an error occurred: {error}",
     "noResponse": "No response",
     "requestFailed": "Request failed",
-    "selectAgentFirst": "Please select a simulated individual first"
+    "selectAgentFirst": "Please select a simulated individual first",
+    "user": "You",
+    "agent": "Agent"
   },
   "graph": {
     "panelTitle": "Graph Relationship Visualization",

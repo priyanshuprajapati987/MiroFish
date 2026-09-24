@@ -94,7 +94,7 @@ def get_graph_entities(graph_id: str):
             }), 500
         
         entity_types_str = request.args.get('entity_types', '')
-        entity_types = [t.strip() for t in entity_types_str.split(',') if t.strip()] if entity_types_str else None
+        entity_types = [et.strip() for et in entity_types_str.split(',') if et.strip()] if entity_types_str else None
         enrich = request.args.get('enrich', 'true').lower() == 'true'
         
         logger.info(f"获取图谱实体: graph_id={graph_id}, entity_types={entity_types}, enrich={enrich}")
@@ -113,10 +113,10 @@ def get_graph_entities(graph_id: str):
         
     except Exception as e:
         logger.error(f"获取图谱实体失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500
 
 
@@ -146,10 +146,10 @@ def get_entity_detail(graph_id: str, entity_uuid: str):
         
     except Exception as e:
         logger.error(f"获取实体详情失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": str(e)
         }), 500
 
 
@@ -183,10 +183,10 @@ def get_entities_by_type(graph_id: str, entity_type: str):
         
     except Exception as e:
         logger.error(f"获取实体失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -260,10 +260,10 @@ def create_simulation():
         
     except Exception as e:
         logger.error(f"创建模拟失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -667,10 +667,10 @@ def prepare_simulation():
         
     except Exception as e:
         logger.error(f"启动准备任务失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -781,6 +781,7 @@ def get_prepare_status():
         
     except Exception as e:
         logger.error(f"查询任务状态失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e)
@@ -813,10 +814,10 @@ def get_simulation(simulation_id: str):
         
     except Exception as e:
         logger.error(f"获取模拟状态失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -842,10 +843,10 @@ def list_simulations():
         
     except Exception as e:
         logger.error(f"列出模拟失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -1002,7 +1003,7 @@ def get_simulation_history():
             try:
                 created_date = sim_dict.get("created_at", "")[:10]
                 sim_dict["created_date"] = created_date
-            except:
+            except Exception:
                 sim_dict["created_date"] = ""
             
             enriched_simulations.append(sim_dict)
@@ -1015,10 +1016,10 @@ def get_simulation_history():
         
     except Exception as e:
         logger.error(f"获取历史模拟失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -1053,10 +1054,10 @@ def get_simulation_profiles(simulation_id: str):
         
     except Exception as e:
         logger.error(f"获取Profile失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -1168,10 +1169,10 @@ def get_simulation_profiles_realtime(simulation_id: str):
         
     except Exception as e:
         logger.error(f"实时获取Profile失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -1298,10 +1299,10 @@ def get_simulation_config_realtime(simulation_id: str):
         
     except Exception as e:
         logger.error(f"实时获取Config失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -1334,10 +1335,10 @@ def get_simulation_config(simulation_id: str):
         
     except Exception as e:
         logger.error(f"获取配置失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -1345,6 +1346,10 @@ def get_simulation_config(simulation_id: str):
 def download_simulation_config(simulation_id: str):
     """下载模拟配置文件"""
     try:
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+$', simulation_id):
+            return jsonify({"success": False, "error": "Invalid simulation_id format"}), 400
+
         manager = SimulationManager()
         sim_dir = manager._get_simulation_dir(simulation_id)
         config_path = os.path.join(sim_dir, "simulation_config.json")
@@ -1363,10 +1368,10 @@ def download_simulation_config(simulation_id: str):
         
     except Exception as e:
         logger.error(f"下载配置失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -1415,10 +1420,10 @@ def download_simulation_script(script_name: str):
         
     except Exception as e:
         logger.error(f"下载脚本失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -1489,10 +1494,10 @@ def generate_profiles():
         
     except Exception as e:
         logger.error(f"生成Profile失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -1639,6 +1644,7 @@ def start_simulation():
                             "error": str(error),
                         }), 409
                     except Exception as error:
+                        logger.debug(traceback.format_exc())
                         return jsonify({
                             "success": False,
                             "error": (
@@ -1778,10 +1784,10 @@ def start_simulation():
         
     except Exception as e:
         logger.error(f"启动模拟失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -1850,13 +1856,17 @@ def stop_simulation():
             manager = SimulationManager()
             state = manager.get_simulation(simulation_id)
             if state:
-                state.status = SimulationStatus.FAILED
-                state.error = str(e)
+                from ..services.simulation_runner import SimulationRunner, RunnerStatus
+                run_state = SimulationRunner.get_run_state(simulation_id)
+                if run_state and run_state.runner_status == RunnerStatus.STOPPED:
+                    state.status = SimulationStatus.STOPPED
+                else:
+                    state.status = SimulationStatus.FAILED
+                    state.error = str(e)
                 manager._save_simulation_state(state)
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -1913,10 +1923,10 @@ def get_run_status(simulation_id: str):
         
     except Exception as e:
         logger.error(f"获取运行状态失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -2014,10 +2024,10 @@ def get_run_status_detail(simulation_id: str):
         
     except Exception as e:
         logger.error(f"获取详细状态失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -2068,10 +2078,10 @@ def get_simulation_actions(simulation_id: str):
         
     except Exception as e:
         logger.error(f"获取动作历史失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -2108,10 +2118,10 @@ def get_simulation_timeline(simulation_id: str):
         
     except Exception as e:
         logger.error(f"获取时间线失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -2135,10 +2145,10 @@ def get_agent_stats(simulation_id: str):
         
     except Exception as e:
         logger.error(f"获取Agent统计失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -2161,9 +2171,14 @@ def get_simulation_posts(simulation_id: str):
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
 
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+$', simulation_id):
+            return jsonify({"success": False, "error": "Invalid simulation_id format"}), 400
+
         sim_dir = os.path.join(
             os.path.dirname(__file__),
-            f'../../uploads/simulations/{simulation_id}'
+            '../../uploads/simulations',
+            simulation_id
         )
 
         db_file = f"{platform}_simulation.db"
@@ -2182,26 +2197,27 @@ def get_simulation_posts(simulation_id: str):
         
         import sqlite3
         conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
         try:
-            cursor.execute("""
-                SELECT * FROM post 
-                ORDER BY created_at DESC 
-                LIMIT ? OFFSET ?
-            """, (limit, offset))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
             
-            posts = [dict(row) for row in cursor.fetchall()]
-            
-            cursor.execute("SELECT COUNT(*) FROM post")
-            total = cursor.fetchone()[0]
-            
-        except sqlite3.OperationalError:
-            posts = []
-            total = 0
-        
-        conn.close()
+            try:
+                cursor.execute("""
+                    SELECT * FROM post 
+                    ORDER BY created_at DESC 
+                    LIMIT ? OFFSET ?
+                """, (limit, offset))
+                
+                posts = [dict(row) for row in cursor.fetchall()]
+                
+                cursor.execute("SELECT COUNT(*) FROM post")
+                total = cursor.fetchone()[0]
+                
+            except sqlite3.OperationalError:
+                posts = []
+                total = 0
+        finally:
+            conn.close()
         
         return jsonify({
             "success": True,
@@ -2215,10 +2231,10 @@ def get_simulation_posts(simulation_id: str):
         
     except Exception as e:
         logger.error(f"获取帖子失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -2239,9 +2255,14 @@ def get_simulation_comments(simulation_id: str):
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
 
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+$', simulation_id):
+            return jsonify({"success": False, "error": "Invalid simulation_id format"}), 400
+
         sim_dir = os.path.join(
             os.path.dirname(__file__),
-            f'../../uploads/simulations/{simulation_id}'
+            '../../uploads/simulations',
+            simulation_id
         )
         
         db_path = os.path.join(sim_dir, f"{platform}_simulation.db")
@@ -2257,30 +2278,31 @@ def get_simulation_comments(simulation_id: str):
         
         import sqlite3
         conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
         try:
-            if post_id:
-                cursor.execute("""
-                    SELECT * FROM comment 
-                    WHERE post_id = ?
-                    ORDER BY created_at DESC 
-                    LIMIT ? OFFSET ?
-                """, (post_id, limit, offset))
-            else:
-                cursor.execute("""
-                    SELECT * FROM comment 
-                    ORDER BY created_at DESC 
-                    LIMIT ? OFFSET ?
-                """, (limit, offset))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
             
-            comments = [dict(row) for row in cursor.fetchall()]
-            
-        except sqlite3.OperationalError:
-            comments = []
-        
-        conn.close()
+            try:
+                if post_id:
+                    cursor.execute("""
+                        SELECT * FROM comment 
+                        WHERE post_id = ?
+                        ORDER BY created_at DESC 
+                        LIMIT ? OFFSET ?
+                    """, (post_id, limit, offset))
+                else:
+                    cursor.execute("""
+                        SELECT * FROM comment 
+                        ORDER BY created_at DESC 
+                        LIMIT ? OFFSET ?
+                    """, (limit, offset))
+                
+                comments = [dict(row) for row in cursor.fetchall()]
+                
+            except sqlite3.OperationalError:
+                comments = []
+        finally:
+            conn.close()
         
         return jsonify({
             "success": True,
@@ -2292,10 +2314,10 @@ def get_simulation_comments(simulation_id: str):
         
     except Exception as e:
         logger.error(f"获取评论失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -2423,10 +2445,10 @@ def interview_agent():
         
     except Exception as e:
         logger.error(f"Interview失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -2561,10 +2583,10 @@ def interview_agents_batch():
 
     except Exception as e:
         logger.error(f"批量Interview失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -2664,10 +2686,10 @@ def interview_all_agents():
 
     except Exception as e:
         logger.error(f"全局Interview失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -2736,10 +2758,10 @@ def get_interview_history():
 
     except Exception as e:
         logger.error(f"获取Interview历史失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -2801,10 +2823,10 @@ def get_env_status():
 
     except Exception as e:
         logger.error(f"获取环境状态失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
 
 
@@ -2851,10 +2873,10 @@ def close_simulation_env():
             timeout=timeout
         )
         
-        # 更新模拟状态
+        # 更新模拟状态（仅在成功时设置COMPLETED）
         manager = SimulationManager()
         state = manager.get_simulation(simulation_id)
-        if state:
+        if state and result.get("success", False):
             state.status = SimulationStatus.COMPLETED
             manager._save_simulation_state(state)
         
@@ -2871,8 +2893,8 @@ def close_simulation_env():
         
     except Exception as e:
         logger.error(f"关闭环境失败: {str(e)}")
+        logger.debug(traceback.format_exc())
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
         }), 500
