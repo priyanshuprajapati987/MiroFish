@@ -70,7 +70,9 @@ def test_zero_entities_persists_failed_state_and_raises(tmp_path, monkeypatch):
             )
 
     monkeypatch.setattr(SimulationManager, "SIMULATION_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(simulation_manager_module, "ZepEntityReader", EmptyReader)
+    monkeypatch.setattr(
+        simulation_manager_module, "get_entity_reader", lambda *a, **k: EmptyReader()
+    )
 
     manager = SimulationManager()
     state = SimulationState(

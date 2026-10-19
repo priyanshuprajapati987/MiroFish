@@ -18,6 +18,15 @@ logger = get_logger('mirofish.zep_entity_reader')
 T = TypeVar('T')
 
 
+def get_entity_reader(api_key: Optional[str] = None):
+    """Factory: local storage reader when USE_LOCAL_STORAGE=true, else Zep Cloud."""
+    if Config.USE_LOCAL_STORAGE:
+        from .local_entity_reader import LocalEntityReader
+        return LocalEntityReader()
+    return ZepEntityReader(api_key)
+
+
+
 @dataclass
 class EntityNode:
     """实体节点数据结构"""

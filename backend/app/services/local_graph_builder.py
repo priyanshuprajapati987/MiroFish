@@ -153,6 +153,17 @@ class LocalGraphBuilderService:
                 progress=60,
                 message=f"Processed {total_chunks} chunks"
             )
+
+            # 4.5 Extract entity instances with LLM (local full mode)
+            extracted = self._extract_entities_from_chunks(
+                graph_id, chunks, entity_types, edge_types, task_id
+            )
+
+            self.task_manager.update_task(
+                task_id,
+                progress=75,
+                message=f"Extracted {extracted} entities"
+            )
             
             # 5. Create relationships
             for edge in edge_types:
@@ -194,6 +205,132 @@ class LocalGraphBuilderService:
             error_msg = f"{str(e)}\n{traceback.format_exc()}"
             self.task_manager.fail_task(task_id, error_msg)
     
+    def _extract_entities_from_chunks(
+        self,
+        graph_id: str,
+        chunks: List[str],
+        entity_types: List[Dict[str, Any]],
+        edge_types: List[Dict[str, Any]],
+        task_id: str,
+        max_chunks: int = 50,
+    ) -> int:
+        """Extract entity instances from text chunks using the configured LLM.
+
+        Returns the number of entity nodes created/updated. Skips silently
+        (with a warning) when no LLM key is configured.
+        """
+        if not Config.LLM_API_KEY:
+            import logging
+            logging.getLogger("mirofish.local_graph_builder").warning(
+                "LLM_API_KEY not set; skipping local entity extraction"
+            )
+            return 0
+
+        import hashlib
+        import re as _re
+        from ..utils.llm_client import LLMClient
+
+        type_names = [et.get("name", "") for et in entity_types if et.get("name")]
+        edge_names = [ed.get("name", "") for ed in edge_types if ed.get("name")]
+        if not type_names:
+            return 0
+
+        client = LLMClient()
+
+        system_prompt = (
+            "You are an entity extractor. Extract entities and relations from the "
+            "text that match the given ontology. Reply ONLY with a JSON object: "
+            '{"entities": [{"name": str, "type": str, "summary": str, '
+            '"attributes": {str: str}}], '
+            '"relations": [{"source": str, "target": str, "type": str, "fact": str}]}. '
+            '"type" must be exactly one of the ontology types. '
+            'Names must be short canonical identifiers. '
+            'If nothing matches, return empty lists.'
+        )
+
+        # name(lower) -> node id, for cross-chunk dedup
+        entity_name_to_id: Dict[str, str] = {}
+        # pre-register any existing entity nodes (resume-safe)
+        graph = self.storage._load_graph(graph_id)
+        for n in graph.get("nodes", []):
+            if n.get("type") == "entity" and n.get("name"):
+                entity_name_to_id[n["name"].strip().lower()] = n["id"]
+
+        entities_created = 0
+        capped_chunks = chunks[:max_chunks]
+
+        for i, chunk in enumerate(capped_chunks):
+            if not chunk or not chunk.strip():
+                continue
+            user_prompt = (
+                f"Ontology entity types: {', '.join(type_names)}\n"
+                f"Ontology relation types: {', '.join(edge_names) or 'RELATED_TO'}\n\n"
+                f"Text:\n{chunk[:4000]}"
+            )
+            try:
+                result = client.chat_json(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0.1,
+                    max_tokens=2048,
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger("mirofish.local_graph_builder").warning(
+                    f"Entity extraction failed on chunk {i}: {e}"
+                )
+                continue
+
+            valid_entities = [
+                en for en in result.get("entities", [])
+                if isinstance(en, dict)
+                and en.get("name")
+                and en.get("type") in type_names
+            ]
+
+            for en in valid_entities:
+                name_key = str(en["name"]).strip().lower()
+                if not name_key:
+                    continue
+                node_id = entity_name_to_id.get(name_key)
+                if not node_id:
+                    slug = _re.sub(r"[^a-zA-Z0-9]+", "_", str(en["name"]).strip())[:40].strip("_")
+                    digest = hashlib.md5(name_key.encode("utf-8")).hexdigest()[:8]
+                    node_id = f"entity_{slug or 'unnamed'}_{digest}"
+                    entity_name_to_id[name_key] = node_id
+                    entities_created += 1
+                self.storage.add_node(graph_id, node_id, {
+                    "type": "entity",
+                    "name": str(en["name"]).strip(),
+                    "entity_type": en["type"],
+                    "labels": ["Entity", en["type"]],
+                    "summary": str(en.get("summary") or ""),
+                    "attributes": en.get("attributes") or {},
+                    "source_chunk": i,
+                })
+
+            for rel in result.get("relations", []):
+                if not isinstance(rel, dict):
+                    continue
+                src = entity_name_to_id.get(str(rel.get("source", "")).strip().lower())
+                tgt = entity_name_to_id.get(str(rel.get("target", "")).strip().lower())
+                if src and tgt and src != tgt:
+                    self.storage.add_edge(graph_id, src, tgt, {
+                        "type": str(rel.get("type") or "RELATED_TO"),
+                        "name": str(rel.get("type") or "RELATED_TO"),
+                        "fact": str(rel.get("fact") or ""),
+                    })
+
+            if (i + 1) % 10 == 0:
+                self.task_manager.update_task(
+                    task_id,
+                    message=f"Extracting entities: chunk {i + 1}/{len(capped_chunks)}"
+                )
+
+        return entities_created
+
     def validate_batch_chunks(self, chunks, batch_size=350):
         """Validate batch chunks - no-op for local storage"""
         pass

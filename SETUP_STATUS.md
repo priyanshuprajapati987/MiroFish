@@ -1,45 +1,41 @@
 # Final Report: MiroFish Setup Status
 
 ## Current Status
-**BUILD SUCCESSFUL!** All local storage modifications are working.
+**FULL LOCAL MODE COMPLETE!** Simulation pipeline runs 100% local — no Zep API needed.
 
 ## What Was Done
 1. Created `local_storage.py` - File-based storage replacing Zep Cloud
 2. Created `local_graph_builder.py` - Local graph builder
 3. Modified `graph.py` - Added local storage code paths
 4. Updated `config.py` - Made Zep optional with `USE_LOCAL_STORAGE=true`
-5. Updated `.env` - Configured with Groq API key
+5. Updated `.env` - Configured with local LLM (Ollama)
+6. **Added `local_entity_reader.py`** - Reads entities from LocalGraphStorage (same interface as ZepEntityReader)
+7. **Added `get_entity_reader()` factory** - Auto-selects local vs Zep based on `USE_LOCAL_STORAGE`
+8. **Wired factory into** `simulation_manager.py` + `api/simulation.py` (prepare step now works without Zep)
+9. **Added LLM entity extraction** in `local_graph_builder.py` - extracts typed entities + relations from text chunks using the configured LLM
+10. **Fixed `_re` NameError** in `local_storage.py` (import was inside class body)
 
 ## Graph Build Status
-- **Project**: Orbit Satellite Launch
-- **Graph ID**: mirofish_c2d08df570a04d40
-- **Status**: GRAPH_COMPLETED
-- **Nodes**: Created successfully
-- **Edges**: Created successfully
+**Local mode:** entity instances are extracted per-chunk via LLM (Ollama),
+stored with `labels: ["Entity", <TypeName>]` so `filter_defined_entities`
+finds them. Relations between co-mentioned entities become graph edges.
 
-## Issue: Simulation Requires Zep Reader
-The simulation prepare step uses `ZepEntityReader` which requires Zep API to read entities from the graph. This is deeply integrated into the simulation pipeline.
-
-## Options to Run Simulation
-
-### Option 1: Get Free Zep API Key (Recommended)
-- **Free Tier**: https://app.getzep.com
-- **Includes**: 10,000 memory entries/month
-- **Just need**: Email registration
-
-### Option 2: Full Local Mode (Requires More Changes)
-Would need to modify:
-- `zep_entity_reader.py` → `local_entity_reader.py`
-- `simulation_runner.py` → Local graph reading
-- `zep_graph_memory_updater.py` → Local memory updates
-
-## Recommendation
-Get free Zep API key from https://app.getzep.com - takes 2 minutes.
-
-**Add to .env:**
+## How to Run (fully local)
+```bash
+# .env
+USE_LOCAL_STORAGE=true
+LLM_API_KEY=ollama          # any value; points at Ollama below
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_MODEL_NAME=llama3.2:latest
+# ZEP_API_KEY not needed in local mode
 ```
-ZEP_API_KEY=your_zep_api_key_here
-USE_LOCAL_STORAGE=false
-```
+Then: `npm run dev` → build graph from a document → create simulation →
+prepare runs against local storage via `LocalEntityReader`.
 
-Then simulation will run fully.
+## Tests
+- `backend/tests/test_local_entity_reader.py` - 8 tests covering reader interface parity
+- `backend/tests/test_simulation_prepare_failure.py` - updated for `get_entity_reader` factory
+
+## Remaining (optional)
+- `zep_graph_memory_updater.py` local mode (write-back of simulation memories).
+  Off by default (`enable_graph_memory_update=False`), so not blocking.

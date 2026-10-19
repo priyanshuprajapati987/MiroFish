@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 import threading
 import time
@@ -20,8 +21,7 @@ LOCAL_STORAGE_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'local_s
 class LocalGraphStorage:
     """Local file-based graph storage to replace Zep Cloud."""
 
-    import re as _re
-    _SAFE_ID_RE = _re.compile(r'^[a-zA-Z0-9_-]+$')
+    _SAFE_ID_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
 
     def __init__(self, storage_dir: str = None):
         self.storage_dir = storage_dir or LOCAL_STORAGE_DIR
@@ -47,7 +47,7 @@ class LocalGraphStorage:
             return self._locks[graph_id]
 
     def _get_graph_path(self, graph_id: str) -> str:
-        safe_id = _re.sub(r'[^a-zA-Z0-9_-]', '_', graph_id).strip('_') or 'unknown'
+        safe_id = re.sub(r'[^a-zA-Z0-9_-]', '_', graph_id).strip('_') or 'unknown'
         return os.path.join(self.graphs_dir, f"{safe_id}.json")
 
     def _load_graph(self, graph_id: str) -> Dict:
