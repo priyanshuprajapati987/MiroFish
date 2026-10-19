@@ -650,51 +650,52 @@ class OntologyGenerator:
             '# ============== 实体类型定义 ==============',
             '',
         ]
-        
-import re as _re
-def _safe_name(name):
-    s = _re.sub(r'\W|^(?=\d)', '_', name.strip()).strip('_')
-    return s or 'Entity'
 
-for entity in ontology.get("entity_types", []):
-    name = entity["name"]
-    desc = entity.get("description", f"A {name} entity.")
-    safe_name = _safe_name(name)
-    
-    code_lines.append(f'class {safe_name}(EntityModel):')
-    code_lines.append(f'    """{desc}"""')
-    
-    attrs = entity.get("attributes", [])
-    if attrs:
-        for attr in attrs:
-            attr_name = attr["name"]
-            # 防止代码注入：验证属性名
-            if not _re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', attr_name):
-                attr_name = _re.sub(r'\W|^(?=\d)', '_', attr_name).strip('_')
-            attr_desc = attr.get("description", attr_name)
-            safe_desc = attr_desc.replace('\\', '\\\\').replace('"', '\\"')
-            code_lines.append(f'    {attr_name}: EntityText = Field(')
-            code_lines.append(f'        description="{safe_desc}",')
-            code_lines.append(f'        default=None')
-            code_lines.append(f'    )')
-    else:
-        code_lines.append('    pass')
-    
-    code_lines.append('')
-    code_lines.append('')
+        import re as _re
 
-code_lines.append('# ============== 关系类型定义 ==============')
-code_lines.append('')
+        def _safe_name(name):
+            s = _re.sub(r'\W|^(?=\d)', '_', name.strip()).strip('_')
+            return s or 'Entity'
 
-# 生成关系类型
-for edge in ontology.get("edge_types", []):
-    name = edge["name"]
-    class_name = _safe_name(name)
-    desc = edge.get("description", f"A {name} relationship.")
-            
+        for entity in ontology.get("entity_types", []):
+            name = entity["name"]
+            desc = entity.get("description", f"A {name} entity.")
+            safe_name = _safe_name(name)
+
+            code_lines.append(f'class {safe_name}(EntityModel):')
+            code_lines.append(f'    """{desc}"""')
+
+            attrs = entity.get("attributes", [])
+            if attrs:
+                for attr in attrs:
+                    attr_name = attr["name"]
+                    # 防止代码注入：验证属性名
+                    if not _re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', attr_name):
+                        attr_name = _re.sub(r'\W|^(?=\d)', '_', attr_name).strip('_')
+                    attr_desc = attr.get("description", attr_name)
+                    safe_desc = attr_desc.replace('\\', '\\\\').replace('"', '\\"')
+                    code_lines.append(f'    {attr_name}: EntityText = Field(')
+                    code_lines.append(f'        description="{safe_desc}",')
+                    code_lines.append(f'        default=None')
+                    code_lines.append(f'    )')
+            else:
+                code_lines.append('    pass')
+
+            code_lines.append('')
+            code_lines.append('')
+
+        code_lines.append('# ============== 关系类型定义 ==============')
+        code_lines.append('')
+
+        # 生成关系类型
+        for edge in ontology.get("edge_types", []):
+            name = edge["name"]
+            class_name = _safe_name(name)
+            desc = edge.get("description", f"A {name} relationship.")
+
             code_lines.append(f'class {class_name}(EdgeModel):')
             code_lines.append(f'    """{desc}"""')
-            
+
             attrs = edge.get("attributes", [])
             if attrs:
                 for attr in attrs:
@@ -707,10 +708,10 @@ for edge in ontology.get("edge_types", []):
                     code_lines.append(f'    )')
             else:
                 code_lines.append('    pass')
-            
+
             code_lines.append('')
             code_lines.append('')
-        
+
         # 生成类型字典
         code_lines.append('# ============== 类型配置 ==============')
         code_lines.append('')
@@ -727,7 +728,7 @@ for edge in ontology.get("edge_types", []):
             code_lines.append(f'    "{name}": {class_name},')
         code_lines.append('}')
         code_lines.append('')
-        
+
         # 生成边的source_targets映射
         code_lines.append('EDGE_SOURCE_TARGETS = {')
         for edge in ontology.get("edge_types", []):
@@ -740,5 +741,5 @@ for edge in ontology.get("edge_types", []):
                 ])
                 code_lines.append(f'    "{name}": [{st_list}],')
         code_lines.append('}')
-        
+
         return '\n'.join(code_lines)

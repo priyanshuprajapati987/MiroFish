@@ -7,6 +7,7 @@ OASIS模拟管理器
 import os
 import json
 import shutil
+import threading
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -145,9 +146,12 @@ class SimulationManager:
     def __init__(self):
         # 确保目录存在
         os.makedirs(self.SIMULATION_DATA_DIR, exist_ok=True)
-        
+
         # 内存中的模拟状态缓存
         self._simulations: Dict[str, SimulationState] = {}
+
+        # 线程锁
+        self._lock = threading.Lock()
     
     def _get_simulation_dir(self, simulation_id: str) -> str:
         """获取模拟数据目录"""

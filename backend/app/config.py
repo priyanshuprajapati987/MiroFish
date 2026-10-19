@@ -1,4 +1,7 @@
-"""\n配置管理\n统一从项目根目录的 .env 文件加载配置\n"""
+"""
+配置管理
+统一从项目根目录的 .env 文件加载配置
+"""
 
 import os
 from dotenv import load_dotenv
@@ -14,41 +17,55 @@ else:
     load_dotenv(override=True)
 
 
+def _int_env(key, default):
+    val = os.environ.get(key)
+    if val is None: return default
+    try: return int(val)
+    except (ValueError, TypeError): return default
+
+
+def _float_env(key, default):
+    val = os.environ.get(key)
+    if val is None: return default
+    try: return float(val)
+    except (ValueError, TypeError): return default
+
+
 class Config:
     """Flask配置类"""
-    
+
     # Flask配置
     SECRET_KEY = os.environ.get('SECRET_KEY') or os.environ.get('FLASK_SECRET', 'dev-secret-change-in-prod')
-# 在生产环境必须设置 SECRET_KEY 环境变量，否则 session 在重启时会失效
-if os.environ.get('FLASK_ENV') == 'production' and SECRET_KEY == 'dev-secret-change-in-prod':
-    raise RuntimeError('SECRET_KEY must be set in production')
+    # 在生产环境必须设置 SECRET_KEY 环境变量，否则 session 在重启时会失效
+    if os.environ.get('FLASK_ENV') == 'production' and SECRET_KEY == 'dev-secret-change-in-prod':
+        raise RuntimeError('SECRET_KEY must be set in production')
     DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
-    
+
     # JSON配置 - 禁用ASCII转义，让中文直接显示
     JSON_AS_ASCII = False
-    
+
     # LLM配置（统一使用OpenAI格式）
     LLM_API_KEY = os.environ.get('LLM_API_KEY')
     LLM_BASE_URL = os.environ.get('LLM_BASE_URL', 'https://api.openai.com/v1')
     LLM_MODEL_NAME = os.environ.get('LLM_MODEL_NAME', 'gpt-4o-mini')
-    
+
     # Zep配置 (Optional - can use local storage instead)
     ZEP_API_KEY = os.environ.get('ZEP_API_KEY')
     USE_LOCAL_STORAGE = os.environ.get('USE_LOCAL_STORAGE', 'true').lower() == 'true'
-    
+
     # 文件上传配置
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
     UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '../uploads'))
     ALLOWED_EXTENSIONS = {'pdf', 'md', 'txt', 'markdown'}
-    
+
     # 文本处理配置
     DEFAULT_CHUNK_SIZE = 500  # 默认切块大小
     DEFAULT_CHUNK_OVERLAP = 50  # 默认重叠大小
-    
+
     # OASIS模拟配置
     OASIS_DEFAULT_MAX_ROUNDS = int(os.environ.get('OASIS_DEFAULT_MAX_ROUNDS', '10'))
     OASIS_SIMULATION_DATA_DIR = os.path.join(os.path.dirname(__file__), '../uploads/simulations')
-    
+
     # OASIS平台可用动作配置
     OASIS_TWITTER_ACTIONS = [
         'CREATE_POST', 'LIKE_POST', 'REPOST', 'FOLLOW', 'DO_NOTHING', 'QUOTE_POST'
@@ -58,24 +75,12 @@ if os.environ.get('FLASK_ENV') == 'production' and SECRET_KEY == 'dev-secret-cha
         'LIKE_COMMENT', 'DISLIKE_COMMENT', 'SEARCH_POSTS', 'SEARCH_USER',
         'TREND', 'REFRESH', 'DO_NOTHING', 'FOLLOW', 'MUTE'
     ]
-    
+
     # Report Agent配置
-    def _int_env(key, default):
-    val = os.environ.get(key)
-    if val is None: return default
-    try: return int(val)
-    except (ValueError, TypeError): return default
-
-def _float_env(key, default):
-    val = os.environ.get(key)
-    if val is None: return default
-    try: return float(val)
-    except (ValueError, TypeError): return default
-
-REPORT_AGENT_MAX_TOOL_CALLS = _int_env('REPORT_AGENT_MAX_TOOL_CALLS', 5)
+    REPORT_AGENT_MAX_TOOL_CALLS = _int_env('REPORT_AGENT_MAX_TOOL_CALLS', 5)
     REPORT_AGENT_MAX_REFLECTION_ROUNDS = _int_env('REPORT_AGENT_MAX_REFLECTION_ROUNDS', 2)
     REPORT_AGENT_TEMPERATURE = _float_env('REPORT_AGENT_TEMPERATURE', 0.5)
-    
+
     @classmethod
     def validate(cls) -> list[str]:
         """验证必要配置"""
