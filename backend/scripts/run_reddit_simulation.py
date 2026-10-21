@@ -578,6 +578,7 @@ class RedditSimulationRunner:
         print(f"\n模拟参数:")
         print(f"  - 总模拟时长: {total_hours}小时")
         print(f"  - 每轮时间: {minutes_per_round}分钟")
+        print(f"  - 起始小时: {time_config.get('start_hour', 9)}")
         print(f"  - 总轮数: {total_rounds}")
         if max_rounds:
             print(f"  - 最大轮数限制: {max_rounds}")
@@ -655,8 +656,14 @@ class RedditSimulationRunner:
         
         for round_num in range(total_rounds):
             simulated_minutes = round_num * minutes_per_round
-            simulated_hour = (simulated_minutes // 60) % 24
-            simulated_day = simulated_minutes // (60 * 24) + 1
+            # start_hour: pehle sim hamesha hour 0 (raat) se start hoti thi,
+            # aur sab agents ke active_hours 7+ se shuru hote hain (raat 0-6
+            # me koi agent active hi nahi) -> pehli rounds me 0 agents, 0 LLM
+            # calls, 0 actions. Default 9 (work hours) taaki short runs bhi
+            # actual simulation karein. time_config.start_hour se override.
+            start_hour = time_config.get("start_hour", 9)
+            simulated_hour = ((start_hour * 60 + simulated_minutes) // 60) % 24
+            simulated_day = (start_hour * 60 + simulated_minutes) // (60 * 24) + 1
             
             active_agents = self._get_active_agents_for_round(
                 self.env, simulated_hour, round_num

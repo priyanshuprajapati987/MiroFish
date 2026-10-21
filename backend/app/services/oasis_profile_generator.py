@@ -265,11 +265,14 @@ class OasisProfileGenerator:
         self.zep_client = None
         self.graph_id = graph_id
         
-        if self.zep_api_key:
+        # Local mode: never touch Zep — retrieval paths no-op on a null client
+        if self.zep_api_key and not Config.USE_LOCAL_STORAGE:
             try:
                 self.zep_client = get_zep_client(self.zep_api_key)
             except Exception as e:
                 logger.warning(f"Zep客户端初始化失败: {e}")
+        elif Config.USE_LOCAL_STORAGE:
+            logger.info("[local] Zep client skipped (USE_LOCAL_STORAGE=true)")
     
     def generate_profile_from_entity(
         self, 

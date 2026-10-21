@@ -11,6 +11,9 @@ from ..models.task import TaskManager, TaskStatus
 from ..services.text_processor import TextProcessor
 from ..utils.locale import t, get_locale, set_locale
 from ..utils.local_storage import get_local_storage
+from ..utils.logger import get_logger
+
+logger = get_logger('mirofish.local_graph_builder')
 
 
 @dataclass
@@ -220,8 +223,7 @@ class LocalGraphBuilderService:
         (with a warning) when no LLM key is configured.
         """
         if not Config.LLM_API_KEY:
-            import logging
-            logging.getLogger("mirofish.local_graph_builder").warning(
+            logger.warning(
                 "LLM_API_KEY not set; skipping local entity extraction"
             )
             return 0
@@ -245,6 +247,8 @@ class LocalGraphBuilderService:
             '"relations": [{"source": str, "target": str, "type": str, "fact": str}]}. '
             '"type" must be exactly one of the ontology types. '
             'Names must be short canonical identifiers. '
+            'Keep summaries and attributes terse (one short phrase each). '
+            'No explanations, no markdown, no code fences — JSON only. '
             'If nothing matches, return empty lists.'
         )
 
@@ -274,11 +278,11 @@ class LocalGraphBuilderService:
                         {"role": "user", "content": user_prompt},
                     ],
                     temperature=0.1,
-                    max_tokens=2048,
+                    # 4096: 2048 truncated llama3.2 JSON mid-object on 4k-char chunks
+                    max_tokens=4096,
                 )
             except Exception as e:
-                import logging
-                logging.getLogger("mirofish.local_graph_builder").warning(
+                logger.warning(
                     f"Entity extraction failed on chunk {i}: {e}"
                 )
                 continue
@@ -329,6 +333,10 @@ class LocalGraphBuilderService:
                     message=f"Extracting entities: chunk {i + 1}/{len(capped_chunks)}"
                 )
 
+        logger.info(
+            f"[local] Entity extraction finished: {entities_created} new entities "
+            f"across {len(capped_chunks)} chunks (model={Config.LLM_MODEL_NAME})"
+        )
         return entities_created
 
     def validate_batch_chunks(self, chunks, batch_size=350):

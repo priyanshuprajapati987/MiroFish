@@ -735,6 +735,51 @@ def _build_graph_impl():
                             "description": ed.get("description", "")
                         })
                     
+                    # Schema edges between entity types (same as
+                    # LocalGraphBuilderService) so the ontology graph is
+                    # connected even before instance extraction.
+                    for ed in ontology.get("edge_types", []):
+                        sts = ed.get("source_targets") or [{}]
+                        st = sts[0] if sts else {}
+                        src = st.get("source", "")
+                        tgt = st.get("target", "")
+                        if src and tgt:
+                            storage.add_edge(
+                                graph_id,
+                                f"entity_type_{src}",
+                                f"entity_type_{tgt}",
+                                {
+                                    "type": ed.get("name", "RELATED_TO"),
+                                    "description": ed.get("description", ""),
+                                },
+                            )
+                    
+                    # Extract entity instances with the LLM (parity with
+                    # LocalGraphBuilderService._extract_entities_from_chunks).
+                    # Best-effort: a failed extraction must not fail the build.
+                    task_manager.update_task(
+                        task_id, progress=70, message="Extracting entities with LLM..."
+                    )
+                    try:
+                        from ..services.local_graph_builder import (
+                            LocalGraphBuilderService,
+                        )
+                        _extractor = LocalGraphBuilderService()
+                        _extracted = _extractor._extract_entities_from_chunks(
+                            graph_id,
+                            chunks,
+                            ontology.get("entity_types", []),
+                            ontology.get("edge_types", []),
+                            task_id,
+                        )
+                        logger.info(
+                            f"[local] Build extracted {_extracted} entity instances"
+                        )
+                    except Exception as _ex:
+                        logger.warning(
+                            f"[local] LLM entity extraction failed (build continues): {_ex}"
+                        )
+                    
                     task_manager.update_task(task_id, progress=90, message="Finalizing...")
                     
                     stats = storage.get_graph_stats(graph_id)
